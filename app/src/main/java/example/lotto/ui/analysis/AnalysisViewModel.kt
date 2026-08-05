@@ -1,9 +1,9 @@
-// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisViewModel.kt
-package example.lotto.ui.analysis
+// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisViewModel.kt
+package com.example.lotto.ui.analysis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import example.lotto.data.repository.LottoRepository
+import com.example.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +23,6 @@ class AnalysisViewModel @Inject constructor(
     private val _analysisMessage = MutableStateFlow("버튼을 눌러 스마트 분석을 시작하세요.")
     val analysisMessage: StateFlow<String> = _analysisMessage.asStateFlow()
 
-    // 팝업 설정 상태 (고정수, 제외수 입력값)
     private val _includeInput = MutableStateFlow("")
     val includeInput: StateFlow<String> = _includeInput.asStateFlow()
 
@@ -50,11 +49,8 @@ class AnalysisViewModel @Inject constructor(
             .filter { it in 1..45 }
 
         val resultSet = mutableSetOf<Int>()
-        
-        // 사용자가 지정한 고정수 먼저 담기 (최대 6개까지만)
         resultSet.addAll(includeList.take(6))
 
-        // 제외수를 피해서 6개가 될 때까지 랜덤 번호 채우기
         while (resultSet.size < 6) {
             val candidate = Random.nextInt(1, 46)
             if (!excludeList.contains(candidate)) {
