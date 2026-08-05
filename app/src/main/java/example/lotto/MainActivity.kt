@@ -24,7 +24,6 @@ import com.example.lotto.ui.analysis.AnalysisViewModel
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.history.HistoryViewModel
 import com.example.lotto.ui.qr.QrScanScreen
-import com.example.lotto.ui.theme.LottoTheme
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Analysis : Screen("analysis", "분석", Icons.Default.Settings)
@@ -41,7 +40,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            LottoTheme {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.Analysis) }
 
                 Scaffold(
