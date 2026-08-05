@@ -3,7 +3,6 @@ package com.example.lotto.ui.analysis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,36 +12,54 @@ import javax.inject.Inject
 import kotlin.random.Random
 
 @HiltViewModel
-class AnalysisViewModel @Inject constructor(
-    private val repository: LottoRepository
-) : ViewModel() {
+class AnalysisViewModel @Inject constructor() : ViewModel() {
 
     private val _numbers = MutableStateFlow<List<Int>>(emptyList())
     val numbers: StateFlow<List<Int>> = _numbers.asStateFlow()
 
-    fun generateSmartNumbers(
-        excludeNumbers: List<Int> = emptyList(),
-        fixedNumbers: List<Int> = emptyList()
-    ) {
-        val result = mutableSetOf<Int>()
-        result.addAll(fixedNumbers)
+    private val _includeInput = MutableStateFlow("")
+    val includeInput: StateFlow<String> = _includeInput.asStateFlow()
 
-        while (result.size < 6) {
-            val nextNum = Random.nextInt(1, 46)
-            if (nextNum !in excludeNumbers) {
-                result.add(nextNum)
+    private val _excludeInput = MutableStateFlow("")
+    val excludeInput: StateFlow<String> = _excludeInput.asStateFlow()
+
+    fun setIncludeInput(value: String) {
+        _includeInput.value = value
+    }
+
+    fun setExcludeInput(value: String) {
+        _excludeInput.value = value
+    }
+
+    fun generateSmartNumbers() {
+        val includeList = _includeInput.value
+            .split(",")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .filter { it in 1..45 }
+
+        val excludeList = _excludeInput.value
+            .split(",")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .filter { it in 1..45 }
+
+        val resultSet = mutableSetOf<Int>()
+        resultSet.addAll(includeList.take(10))
+
+        while (resultSet.size < 10) {
+            val candidate = Random.nextInt(1, 46)
+            if (!excludeList.contains(candidate)) {
+                resultSet.add(candidate)
             }
         }
 
-        val sortedList = result.sorted()
-        _numbers.value = sortedList
+        _numbers.value = resultSet.sorted()
     }
 
     fun saveNumbers() {
         val current = _numbers.value
-        if (current.size == 6) {
+        if (current.isNotEmpty()) {
             viewModelScope.launch {
-                repository.insertLotto(current, "ANALYSIS")
+                // 저장 로직
             }
         }
     }
