@@ -17,12 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -31,7 +31,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,8 +64,7 @@ fun AnalysisScreen(
     var showDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableStateOf(5) }
     
-    // 버튼 클릭 효과를 위한 인터랙션 및 스케일 상태
-    val snackbarHostState = remember { remember { SnackbarHostState() } }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(saveMessage) {
         saveMessage?.let {
@@ -83,7 +80,7 @@ fun AnalysisScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. 최근 당첨 번호 카드 (부드러운 곡선 및 그림자)
+            // 1. 최근 당첨 번호 카드
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -153,7 +150,7 @@ fun AnalysisScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 5개 조합 / 10개 조합 선택 탭 (부드러운 전환)
+            // 5개 조합 / 10개 조합 선택 탭
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -234,7 +231,6 @@ fun AnalysisScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 메인 추출 버튼 (누를 때 효과 부여)
             PressableActionButton(
                 text = "스마트 분석 번호 추출",
                 onClick = { viewModel.generateSmartNumbers(selectedSetCount) },
@@ -243,7 +239,6 @@ fun AnalysisScreen(
 
             if (numberSets.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                // 번호 저장 버튼
                 PressableActionButton(
                     text = "이 번호 세트 저장하기",
                     onClick = { viewModel.saveNumbers() },
@@ -252,7 +247,6 @@ fun AnalysisScreen(
             }
         }
 
-        // 스낵바 위치
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -261,7 +255,6 @@ fun AnalysisScreen(
         )
     }
 
-    // 4. 다중 조건 중 "선택"하는 방식의 다이얼로그
     if (showDialog) {
         val conditions = listOf(
             "홀짝 비율 균형 (3:3)",
@@ -313,7 +306,6 @@ fun AnalysisScreen(
     }
 }
 
-// 3. 버튼 클릭 피드백(눌림 효과) 컴포넌트
 @Composable
 fun PressableButton(
     text: String,
