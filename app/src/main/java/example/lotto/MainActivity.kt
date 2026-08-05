@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -60,7 +62,7 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     icon = { Icon(screen.icon, contentDescription = screen.title) },
                                     label = { Text(screen.title) },
-                                    selected = currentScreen == screen.route,
+                                    selected = currentScreen == screen,
                                     onClick = { currentScreen = screen },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = Color(0xFF0EA5E9),
@@ -83,12 +85,11 @@ class MainActivity : ComponentActivity() {
                         when (currentScreen) {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
                             is Screen.Fortune -> {
-                                // 운세 화면 연결 부위
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text("운세 화면 준비중", color = Color(0xFF64748B))
                                 }
                             }
-                            is Screen.QrScan -> QrScanScreen() // 수정된 QrScanScreen 적용 완료
+                            is Screen.QrScan -> QrScanScreen()
                             is Screen.History -> HistoryScreen(viewModel = historyViewModel)
                         }
                     }
