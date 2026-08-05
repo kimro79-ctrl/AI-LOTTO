@@ -1,4 +1,4 @@
-// File Path: app/src/main/java/example/lotto/MainActivity.kt
+// File Path: app/src/main/java/com/example/lotto/MainActivity.kt
 package com.example.lotto
 
 import android.os.Bundle
