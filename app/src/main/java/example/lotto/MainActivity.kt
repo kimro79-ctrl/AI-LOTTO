@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.lotto.ui.analysis.AnalysisScreen
 import com.example.lotto.ui.analysis.AnalysisViewModel
 import com.example.lotto.ui.fortune.FortuneScreen
-import com.example.lotto.ui.fortune.FortuneViewModel
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.history.HistoryViewModel
 import com.example.lotto.ui.qr.QrScanScreen
@@ -37,7 +36,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 class MainActivity : ComponentActivity() {
 
     private val analysisViewModel: AnalysisViewModel by viewModels()
-    private val fortuneViewModel: FortuneViewModel by viewModels()
     private val historyViewModel: HistoryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +87,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (currentScreen) {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
-                            is Screen.Fortune -> FortuneScreen(viewModel = fortuneViewModel, analysisViewModel = analysisViewModel)
+                            is Screen.Fortune -> FortuneScreen() // 매개변수 없이 호출
                             is Screen.QrScan -> QrScanScreen()
                             is Screen.History -> HistoryScreen(viewModel = historyViewModel)
                         }
