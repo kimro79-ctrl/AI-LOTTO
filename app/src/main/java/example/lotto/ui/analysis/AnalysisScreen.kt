@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,39 +47,41 @@ import androidx.hilt.navigation.compose.hiltViewModel
 fun AnalysisScreen(
     viewModel: AnalysisViewModel = hiltViewModel()
 ) {
-    val numbers by viewModel.numbers.collectAsState()
+    val numberSets by viewModel.numberSets.collectAsState()
     val includeInput by viewModel.includeInput.collectAsState()
     val excludeInput by viewModel.excludeInput.collectAsState()
+    val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
-    var selectedCountMode by remember { mutableStateOf(6) }
+    var selectedCountMode by remember { mutableStateOf(6) } // 기본 6개 또는 사용자 선택
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 메인 페이지 최근 당첨 번호 배너
+        // 1. 최근 당첨 번호 배너 (실제 로또 색상 공 적용)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "최근 당첨 번호 배너",
+                    text = "최근 제 1100회 당첨 번호",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    listOf(3, 12, 21, 30, 37, 42).forEach { num ->
-                        SmallBallItem(number = num)
+                    latestWinNumbers.forEach { num ->
+                        LottoBallItem(number = num, size = 34)
                     }
                 }
             }
@@ -85,25 +89,25 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 타이틀 및 조건 설정 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "스마트 패턴 분석 번호 생성",
-                style = MaterialTheme.typography.titleLarge,
+                text = "스마트 패턴 분석 번호",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Surface(
                 onClick = { showDialog = true },
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.padding(4.dp)
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -112,14 +116,14 @@ fun AnalysisScreen(
                         contentDescription = "설정",
                         modifier = Modifier.size(16.dp)
                     )
-                    Text(text = "조건 설정", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "조건 설정", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 5개 설정 / 10개 설정 배너 버튼 (weight 수정 완료)
+        // 2. 5개 설정 / 10개 설정 모드 선택 탭
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -129,76 +133,101 @@ fun AnalysisScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedCountMode == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "5개 설정 모드")
+                Text(text = "5개 추출 모드", fontWeight = FontWeight.Bold)
             }
             Button(
                 onClick = { selectedCountMode = 10 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedCountMode == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "10개 설정 모드")
+                Text(text = "10개 추출 모드", fontWeight = FontWeight.Bold)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        // 3. 결과 리스트 영역 (LazyColumn으로 여러 세트 출력)
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "분석 조건 (${selectedCountMode}개 모드): 홀짝 비율 / 고정수 및 제외수 적용",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (numbers.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        modifier = Modifier.fillMaxWidth()
+            if (numberSets.isNotEmpty()) {
+                itemsIndexed(numberSets) { index, numbers ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        numbers.take(selectedCountMode).forEach { num ->
-                            LottoBallItem(number = num)
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "추천 조합 ${index + 1} (${selectedCountMode}개 모드)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                numbers.forEach { num ->
+                                    LottoBallItem(number = num, size = 32)
+                                }
+                            }
                         }
                     }
-                } else {
-                    Text(
-                        text = "버튼을 눌러 번호를 생성하세요",
-                        color = Color.Gray
-                    )
+                }
+            } else {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "하단 버튼을 눌러 번호를 추출하세요",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // 추출 버튼
         Button(
-            onClick = { viewModel.generateSmartNumbers() },
-            modifier = Modifier.fillMaxWidth()
+            onClick = { viewModel.generateSmartNumbers(selectedCountMode) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Text(text = "스마트 분석 번호 추출")
+            Text(text = "스마트 분석 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
         }
 
-        if (numbers.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
+        if (numberSets.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = { viewModel.saveNumbers() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(text = "이 번호 저장하기")
+                Text(text = "이 번호 세트 저장하기", fontWeight = FontWeight.Bold)
             }
         }
     }
 
+    // 조건 설정 다이얼로그
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -227,16 +256,12 @@ fun AnalysisScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = { showDialog = false }
-                ) {
+                Button(onClick = { showDialog = false }) {
                     Text("적용하기")
                 }
             },
             dismissButton = {
-                OutlinedButton(
-                    onClick = { showDialog = false }
-                ) {
+                OutlinedButton(onClick = { showDialog = false }) {
                     Text("취소")
                 }
             }
@@ -245,43 +270,26 @@ fun AnalysisScreen(
 }
 
 @Composable
-fun LottoBallItem(number: Int) {
+fun LottoBallItem(number: Int, size: Int) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFFBC02D)
-        in 11..20 -> Color(0xFF1E88E5)
-        in 21..30 -> Color(0xFFE53935)
-        in 31..40 -> Color(0xFF8E24AA)
-        else -> Color(0xFF43A047)
+        in 1..10 -> Color(0xFFFBC02D) // 노란색
+        in 11..20 -> Color(0xFF1E88E5) // 파란색
+        in 21..30 -> Color(0xFFE53935) // 빨간색
+        in 31..40 -> Color(0xFF757575) // 회색
+        else -> Color(0xFF43A047) // 초록색
     }
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(36.dp)
+            .size(size.dp)
             .background(color = ballColor, shape = CircleShape)
     ) {
         Text(
             text = number.toString(),
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
-        )
-    }
-}
-
-@Composable
-fun SmallBallItem(number: Int) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(26.dp)
-            .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape)
-    ) {
-        Text(
-            text = number.toString(),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp
+            fontSize = (size * 0.38).sp
         )
     }
 }
