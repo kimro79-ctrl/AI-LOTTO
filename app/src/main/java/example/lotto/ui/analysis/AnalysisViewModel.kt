@@ -134,10 +134,12 @@ class AnalysisViewModel @Inject constructor(
             viewModelScope.launch {
                 val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 current.forEach { numbers ->
+                    // LottoEntity 생성자 구조 차이로 인한 컴파일 오류 방지를 위해 위치 기반 생성 또는 기본 생성자로 대체
                     val entity = LottoEntity(
-                        numbers = numbers.joinToString(","),
-                        type = "ANALYSIS",
-                        date = currentDate
+                        0L,
+                        numbers.joinToString(","),
+                        "ANALYSIS",
+                        currentDate
                     )
                     repository.insertLotto(entity)
                 }
@@ -152,9 +154,10 @@ class AnalysisViewModel @Inject constructor(
                 val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 sets.forEach { numbers ->
                     val entity = LottoEntity(
-                        numbers = numbers.joinToString(","),
-                        type = "FORTUNE",
-                        date = currentDate
+                        0L,
+                        numbers.joinToString(","),
+                        "FORTUNE",
+                        currentDate
                     )
                     repository.insertLotto(entity)
                 }
