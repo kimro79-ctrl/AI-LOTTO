@@ -7,11 +7,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -29,7 +30,6 @@ import com.example.lotto.ui.analysis.AnalysisScreen
 import com.example.lotto.ui.fortune.FortuneScreen
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.qr.QRScannerScreen
-import com.example.lotto.ui.theme.LottoAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            LottoAppTheme {
+            // 커스텀 테마(LottoAppTheme) 대신 기본 MaterialTheme 사용
+            MaterialTheme {
                 MainScreen()
             }
         }
@@ -50,10 +51,11 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
-    object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Analytics)
-    object Fortune : BottomNavItem("fortune", "운세", Icons.Default.AutoAwesome)
-    object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.QrCodeScanner)
-    object History : BottomNavItem("history", "내역", Icons.Default.History)
+    // 기본 내장 아이콘으로 변경
+    object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Build)
+    object Fortune : BottomNavItem("fortune", "운세", Icons.Default.Favorite)
+    object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.Search)
+    object History : BottomNavItem("history", "내역", Icons.Default.List)
 }
 
 @Composable
@@ -118,4 +120,3 @@ fun MainScreen() {
         }
     }
 }
-
