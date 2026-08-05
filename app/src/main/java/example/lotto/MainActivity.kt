@@ -4,120 +4,95 @@ package com.example.lotto
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import com.example.lotto.ui.analysis.AnalysisScreen
 import com.example.lotto.ui.analysis.AnalysisViewModel
-import com.example.lotto.ui.fortune.FortuneScreen
 import com.example.lotto.ui.history.HistoryScreen
-import com.example.lotto.ui.qr.QRScannerScreen
-import dagger.hilt.android.AndroidEntryPoint
+import com.example.lotto.ui.history.HistoryViewModel
+import com.example.lotto.ui.qr.QrScanScreen
+import com.example.lotto.ui.theme.LottoTheme
 
-@AndroidEntryPoint
+sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
+    object Analysis : Screen("analysis", "분석", Icons.Default.Settings)
+    object Fortune : Screen("fortune", "운세", Icons.Default.DateRange)
+    object QrScan : Screen("qr_scan", "QR스캔", Icons.Default.Search)
+    object History : Screen("history", "내역", Icons.Default.List)
+}
+
 class MainActivity : ComponentActivity() {
+
+    private val analysisViewModel: AnalysisViewModel by viewModels()
+    private val historyViewModel: HistoryViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
-            MaterialTheme {
-                MainScreen()
-            }
-        }
-    }
-}
+            LottoTheme {
+                var currentScreen by remember { mutableStateOf<Screen>(Screen.Analysis) }
 
-sealed class BottomNavItem(
-    val route: String,
-    val title: String,
-    val icon: ImageVector
-) {
-    object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Build)
-    object Fortune : BottomNavItem("fortune", "운세", Icons.Default.Favorite)
-    object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.Search)
-    object History : BottomNavItem("history", "내역", Icons.Default.List)
-}
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        NavigationBar(
+                            containerColor = Color(0xFFF1F5F9),
+                            contentColor = Color(0xFF64748B)
+                        ) {
+                            val items = listOf(
+                                Screen.Analysis,
+                                Screen.Fortune,
+                                Screen.QrScan,
+                                Screen.History
+                            )
 
-@Composable
-fun MainScreen() {
-    val navController = rememberNavController()
-    val analysisViewModel: AnalysisViewModel = hiltViewModel()
-
-    val navItems = listOf(
-        BottomNavItem.Analysis,
-        BottomNavItem.Fortune,
-        BottomNavItem.QRScan,
-        BottomNavItem.History
-    )
-
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route
-
-                navItems.forEach { item ->
-                    NavigationBarItem(
-                        selected = currentRoute == item.route,
-                        onClick = {
-                            if (currentRoute != item.route) {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
+                            items.forEach { screen ->
+                                NavigationBarItem(
+                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
+                                    label = { Text(screen.title) },
+                                    selected = currentScreen == screen.route,
+                                    onClick = { currentScreen = screen },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = Color(0xFF0EA5E9),
+                                        selectedTextColor = Color(0xFF0EA5E9),
+                                        unselectedIconColor = Color(0xFF64748B),
+                                        unselectedTextColor = Color(0xFF64748B),
+                                        indicatorColor = Color(0xFFE0F2FE)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                ) { innerPadding ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        when (currentScreen) {
+                            is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
+                            is Screen.Fortune -> {
+                                // 운세 화면 연결 부위
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("운세 화면 준비중", color = Color(0xFF64748B))
                                 }
                             }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = item.icon,
-                                contentDescription = item.title
-                            )
-                        },
-                        label = { Text(text = item.title) }
-                    )
+                            is Screen.QrScan -> QrScanScreen() // 수정된 QrScanScreen 적용 완료
+                            is Screen.History -> HistoryScreen(viewModel = historyViewModel)
+                        }
+                    }
                 }
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = BottomNavItem.Analysis.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(BottomNavItem.Analysis.route) {
-                AnalysisScreen(viewModel = analysisViewModel)
-            }
-            composable(BottomNavItem.Fortune.route) {
-                FortuneScreen()
-            }
-            composable(BottomNavItem.QRScan.route) {
-                QRScannerScreen()
-            }
-            composable(BottomNavItem.History.route) {
-                HistoryScreen()
             }
         }
     }
