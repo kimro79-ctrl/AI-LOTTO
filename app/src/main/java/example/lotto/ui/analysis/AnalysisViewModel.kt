@@ -1,9 +1,9 @@
-// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisViewModel.kt
-package com.example.lotto.ui.analysis
+// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisViewModel.kt
+package example.lotto.ui.analysis
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lotto.data.repository.LottoRepository
+import example.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
