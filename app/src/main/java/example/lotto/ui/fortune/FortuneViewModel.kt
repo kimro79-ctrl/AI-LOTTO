@@ -36,14 +36,14 @@ class FortuneViewModel @Inject constructor(
         Pair("3. 여황제 (The Empress)", "풍요와 안정, 물질적인 성취와 재물복이 가득 찬 운세입니다."),
         Pair("4. 황제 (The Emperor)", "확고한 리더십과 결단력으로 큰 성과와 재물을 거머쥐는 기운입니다."),
         Pair("7. 전차 (The Chariot)", "거침없는 돌파력과 승리의 에너지가 가득하여 과감한 선택이 빛을 봅니다."),
-        Pair("10. 운명의 루비 (Wheel of Fortune)", "인생의 거대한 행운의 흐름이 당신을 향해 완벽하게 회전하고 있습니다."),
+        Pair("10. 운명의 수레바퀴 (Wheel of Fortune)", "인생의 거대한 행운의 흐름이 당신을 향해 완벽하게 회전하고 있습니다."),
         Pair("19. 태양 (The Sun)", "만물을 비추는 밝은 에너지와 최고의 행운, 대길(大吉)의 기운입니다.")
     )
 
-    fun drawTarotCard(setCount: Int) {
+    fun selectTarotCard(setCount: Int) {
         val selectedCard = tarotDeck.random()
         
-        _tarotCardName.value = "[오늘의 타로: ${selectedCard.first}]"
+        _tarotCardName.value = "[선택한 타로: ${selectedCard.first}]"
         _tarotMeaning.value = selectedCard.second
 
         val sets = mutableListOf<List<Int>>()
