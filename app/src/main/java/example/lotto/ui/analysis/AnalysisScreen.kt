@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -122,7 +123,7 @@ fun AnalysisScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                numbers.forEach { num ->
+                for (num in numbers) {
                     AnalysisBallItem(number = num)
                 }
             }
@@ -151,7 +152,7 @@ fun AnalysisScreen(
     }
 
     if (showDialog) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text(text = "상세 분석 조건 설정") },
             text = {
@@ -162,7 +163,7 @@ fun AnalysisScreen(
                     
                     OutlinedTextField(
                         value = includeInput,
-                        onValueChange = { viewModel.setIncludeInput(it) },
+                        onValueChange = { value -> viewModel.setIncludeInput(value) },
                         label = { Text("반드시 포함할 고정수") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -170,7 +171,7 @@ fun AnalysisScreen(
 
                     OutlinedTextField(
                         value = excludeInput,
-                        onValueChange = { viewModel.setExcludeInput(it) },
+                        onValueChange = { value -> viewModel.setExcludeInput(value) },
                         label = { Text("제외할 번호") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
