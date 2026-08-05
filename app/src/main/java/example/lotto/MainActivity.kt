@@ -1,4 +1,4 @@
-// File Path: app/src/main/java/com/example/lotto/MainActivity.kt
+// File Path: app/src/main/java/example/lotto/MainActivity.kt
 package com.example.lotto
 
 import android.os.Bundle
@@ -61,8 +61,6 @@ sealed class BottomNavItem(
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    
-    // Hilt 뷰모델을 공유하여 분석 화면과 운세 화면에서 공용으로 저장 기능 활용
     val analysisViewModel: AnalysisViewModel = hiltViewModel()
 
     val navItems = listOf(
@@ -113,11 +111,7 @@ fun MainScreen() {
                 AnalysisScreen(viewModel = analysisViewModel)
             }
             composable(BottomNavItem.Fortune.route) {
-                FortuneScreen(
-                    onSaveNumbers = { sets, _ ->
-                        analysisViewModel.saveExternalNumbers(sets)
-                    }
-                )
+                FortuneScreen()
             }
             composable(BottomNavItem.QRScan.route) {
                 QRScannerScreen()
