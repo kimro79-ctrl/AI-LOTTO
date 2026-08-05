@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/MainActivity.kt
-package com.example.lotto
+// File Path: app/src/main/java/example/lotto/MainActivity.kt
+package example.lotto
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -26,10 +26,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.lotto.ui.analysis.AnalysisScreen
-import com.example.lotto.ui.fortune.FortuneScreen
-import com.example.lotto.ui.history.HistoryScreen
-import com.example.lotto.ui.qr.QRScannerScreen
+import example.lotto.ui.analysis.AnalysisScreen
+import example.lotto.ui.fortune.FortuneScreen
+import example.lotto.ui.history.HistoryScreen
+import example.lotto.ui.qr.QRScannerScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
