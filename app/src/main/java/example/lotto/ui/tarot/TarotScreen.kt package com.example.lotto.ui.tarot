@@ -1,0 +1,228 @@
+// File Path: app/src/main/java/com/example/lotto/ui/tarot/TarotScreen.kt
+package com.example.lotto.ui.tarot
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+
+@Composable
+fun TarotScreen(
+    viewModel: TarotViewModel = hiltViewModel()
+) {
+    var selectedSetCount by remember { mutableStateOf(5) }
+
+    val tarotCardName by viewModel.tarotCardName.collectAsState()
+    val tarotMeaning by viewModel.tarotMeaning.collectAsState()
+    val generatedTarotSets by viewModel.generatedTarotSets.collectAsState()
+    val saveMessage by viewModel.saveMessage.collectAsState()
+
+    val context = LocalContext.current
+
+    LaunchedEffect(saveMessage) {
+        saveMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearSaveMessage()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "타로 카드 운세",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { selectedSetCount = 5 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedSetCount == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(text = "5개 조합", fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = { selectedSetCount = 10 },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedSetCount == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(text = "10개 조합", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = { viewModel.drawTarotCard(selectedSetCount) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+        ) {
+            Text(text = "타로 카드 뽑기 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (generatedTarotSets.isNotEmpty()) {
+            Button(
+                onClick = { viewModel.saveAllTarotNumbers() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (tarotCardName != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = tarotCardName ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = tarotMeaning ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                itemsIndexed(generatedTarotSets) { index, numbers ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "타로 맞춤 조합 ${index + 1}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                numbers.forEach { num ->
+                                    TarotBallItem(number = num, size = 32)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "버튼을 눌러 오늘의 타로 카드를 뽑아보세요",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TarotBallItem(number: Int, size: Int) {
+    val ballColor = when (number) {
+        in 1..10 -> Color(0xFFFBC02D)
+        in 11..20 -> Color(0xFF1E88E5)
+        in 21..30 -> Color(0xFFE53935)
+        in 31..40 -> Color(0xFF757575)
+        else -> Color(0xFF43A047)
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size.dp)
+            .background(color = ballColor, shape = CircleShape)
+    ) {
+        Text(
+            text = number.toString(),
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = (size * 0.38).sp
+        )
+    }
+}
+
