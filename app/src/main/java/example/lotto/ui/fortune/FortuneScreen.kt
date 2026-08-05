@@ -2,7 +2,6 @@
 package com.example.lotto.ui.fortune
 
 import android.widget.Toast
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -77,7 +75,6 @@ fun FortuneScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 조합 개수 선택 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -115,7 +112,6 @@ fun FortuneScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 사용자가 직접 고를 수 있는 카드 3장 배치
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -229,7 +225,7 @@ fun CardBackItem(cardIndex: Int, onClick: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "TAROT",
-                color = Color.Gold,
+                color = Color(0xFFFFD700), // 수정됨: 올바른 골드 컬러 코드 적용
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
