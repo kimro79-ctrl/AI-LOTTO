@@ -34,46 +34,69 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.Calendar
 import kotlin.random.Random
 
 @Composable
 fun FortuneScreen() {
     var birthInput by remember { mutableStateOf("") }
+    var fortuneTitle by remember { mutableStateOf<String?>(null) }
     var fortuneResult by remember { mutableStateOf<String?>(null) }
     var fortuneDetails by remember { mutableStateOf<String?>(null) }
     var generatedFortuneSets by remember { mutableStateOf<List<List<Int>>>(emptyList()) }
     var selectedSetCount by remember { mutableStateOf(5) } // 5개 또는 10개 조합 선택
 
-    // 요일별 디테일 운세 풀이 데이터
-    val dayOfWeekFortunes = mapOf(
-        Calendar.MONDAY to "월요일: 새로운 시작의 기운이 강합니다. 직관을 믿고 도전하면 뜻밖의 재물운이 따르는 하루입니다.",
-        Calendar.TUESDAY to "화요일: 에너지가 넘치는 날이지만 성급한 지출은 금물입니다. 차분하게 주변을 살피면 행운이 찾아옵니다.",
-        Calendar.WEDNESDAY to "수요일: 귀인의 도움을 받을 수 있는 형국입니다. 협력이나 공동의 선택에서 좋은 결과가 기대됩니다.",
-        Calendar.THURSDAY to "목요일: 변화와 변동의 기운이 큽니다. 평소에 선택하지 않던 과감한 숫자가 행운을 가져다줍니다.",
-        Calendar.FRIDAY to "금요일: 주말을 앞두고 마음의 여유가 생기는 날입니다. 문서운과 재물운의 조화가 매우 좋습니다.",
-        Calendar.SATURDAY to "토요일: 황금 같은 추첨의 날! 직감적으로 끌리는 숫자가 곧 당첨 번호가 될 확률이 높은 대길(大吉)의 날입니다.",
-        Calendar.SUNDAY to "일요일: 휴식과 충전의 날입니다. 과거의 데이터와 패턴을 분석하여 다음 주를 준비하면 좋습니다."
+    // 사주 오행 및 천간리지 풀이 데이터 풀(Pool)
+    data class SajuFortune(val title: String, val summary: String, val detail: String)
+
+    val sajuPool = listOf(
+        SajuFortune(
+            title = "[청룡(木)의 생동하는 사주 기운]",
+            summary = "입력하신 사주에 나무(木)의 성질이 강하게 작용하여, 만물이 자라나듯 재물운과 명예운이 크게 상승하는 형국입니다.",
+            detail = "막혀 있던 자금 흐름이 시원하게 풀리며, 직관적으로 떠오르는 번호에 강력한 행운의 생명력이 실립니다."
+        ),
+        SajuFortune(
+            title = "[태양(火)의 뻗어나가는 사주 기운]",
+            summary = "불(火)의 에너지가 충만하여 활동 범위가 넓어지고 주변의 이목과 행운을 한 몸에 받는 대길(大吉)의 사주입니다.",
+            detail = "과감하고 화려한 숫자 조합에서 대박의 행운이 터져 나올 확률이 매우 높은 하루입니다."
+        ),
+        SajuFortune(
+            title = "[대지(土)의 든든한 재물 사주 기운]",
+            summary = "흙(土)의 안정된 기운이 재물을 단단하게 갈무리해주어 문서운과 횡재수가 묵직하게 따르는 사주입니다.",
+            detail = "중후하고 균형 잡힌 번호 배치 속에서 안정적인 당첨의 기쁨을 맞이할 수 있는 에너지가 깃들어 있습니다."
+        ),
+        SajuFortune(
+            title = "[황금(金)의 예리한 결실 사주 기운]",
+            summary = "단단한 쇠(金)의 예리함이 날카로운 직관력을 만들어내어 숨겨진 행운의 번호를 정확히 포착하는 사주입니다.",
+            detail = "규칙적이거나 간결한 패턴 속에서 뜻밖의 큰 재물이 들어오는 형상을 띠고 있습니다."
+        ),
+        SajuFortune(
+            title = "[흐르는 물(水)의 지혜로운 사주 기운]",
+            summary = "깊은 물(水)의 유연하고 지혜로운 기운이 유연한 대처와 함께 의외의 행운을 강력하게 끌어당기는 사주입니다.",
+            detail = "전체적으로 유순하고 골고루 퍼진 숫자 선택이 최고의 결과를 안겨다 줍니다."
+        )
     )
 
-    fun calculateFortune() {
+    fun calculateSajuFortune() {
         if (birthInput.length < 4) return
 
-        val calendar = Calendar.getInstance()
-        val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+        // 입력한 생년월일을 숫자로 변환하여 시드값으로 활용 (고유한 사주 결과 도출)
+        val birthInt = birthInput.toIntOrNull() ?: 1234
+        val random = Random(birthInt + System.currentTimeMillis() % 1000)
         
-        fortuneResult = dayOfWeekFortunes[dayOfWeek] ?: "오늘 하루 평탄하고 안정적인 기운이 가득합니다."
-        fortuneDetails = "생년월일(${birthInput})의 기운과 오늘의 천문 에너지를 결합하여 분석한 맞춤형 행운 가이드입니다."
+        val selectedSaju = sajuPool[random.nextInt(sajuPool.size)]
+
+        fortuneTitle = selectedSaju.title
+        fortuneResult = selectedSaju.summary
+        fortuneDetails = selectedSaju.detail
 
         val sets = mutableListOf<List<Int>>()
         for (i in 0 until selectedSetCount) {
             val resultSet = mutableSetOf<Int>()
-            // 생년월일 기반 시드값 반영 조합 생성
-            val seed = birthInput.toIntOrNull() ?: 1234
-            val random = Random(seed + i + System.currentTimeMillis())
+            // 생년월일과 조합 인덱스를 결합한 난수 생성
+            val setRandom = Random(birthInt + i * 79 + System.currentTimeMillis())
 
             while (resultSet.size < 6) {
-                resultSet.add(random.nextInt(1, 46))
+                resultSet.add(setRandom.nextInt(1, 46))
             }
             sets.add(resultSet.sorted())
         }
@@ -87,7 +110,7 @@ fun FortuneScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "요일별 맞춤 행운 운세",
+            text = "생년월일 사주 운세",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
@@ -135,14 +158,14 @@ fun FortuneScreen() {
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = { calculateFortune() },
+            onClick = { calculateSajuFortune() },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(52.dp),
             shape = RoundedCornerShape(12.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Text(text = "운세 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(text = "사주 풀이 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -164,7 +187,7 @@ fun FortuneScreen() {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "오늘의 디테일 운세 요약",
+                                text = fortuneTitle ?: "",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
@@ -186,7 +209,7 @@ fun FortuneScreen() {
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
-                                text = "운세 추천 조합 ${index + 1}",
+                                text = "사주 맞춤 조합 ${index + 1}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.Gray,
                                 fontWeight = FontWeight.Bold
@@ -212,7 +235,7 @@ fun FortuneScreen() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "생년월일을 입력하고 운세를 확인하세요",
+                            text = "생년월일을 입력하고 사주 풀이를 확인하세요",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyMedium
                         )
