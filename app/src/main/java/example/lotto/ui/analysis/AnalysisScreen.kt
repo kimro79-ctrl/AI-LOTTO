@@ -1,7 +1,8 @@
-// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisScreen.kt
-package com.example.lotto.ui.analysis
+// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisScreen.kt
+package example.lotto.ui.analysis
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,15 +14,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,12 +40,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.window.core.layout.WindowSizeClass
 
 @Composable
 fun AnalysisScreen(
     viewModel: AnalysisViewModel = hiltViewModel()
 ) {
     val numbers by viewModel.numbers.collectAsState()
+    val message by viewModel.analysisMessage.collectAsState()
+    val includeInput by viewModel.includeInput.collectAsState()
+    val excludeInput by viewModel.excludeInput.collectAsState()
+
+    // 팝업(다이얼로그) 표시 여부 상태
+    var showDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -43,11 +61,38 @@ fun AnalysisScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Text(
-            text = "스마트 패턴 분석 번호 생성",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "스마트 AI 번호 분석",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            // 설정 팝업을 여는 버튼 (누르는 느낌을 위해 Surface 사용)
+            Surface(
+                onClick = { showDialog = true },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.padding(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "조건 설정",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(text = "분석 조건", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -55,58 +100,109 @@ fun AnalysisScreen(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "분석 조건: 홀짝 비율 / 고정수 및 제외수 적용",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "분석 상태 및 결과",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                if (numbers.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        numbers.forEach { num ->
-                            LottoBallItem(number = num)
-                        }
-                    }
-                } else {
-                    Text(
-                        text = "버튼을 눌러 번호를 생성하세요",
-                        color = Color.Gray
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = message)
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        if (numbers.isNotEmpty()) {
+            Text(
+                text = "추천 분석 번호",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                numbers.forEach { num ->
+                    AnalysisBallItem(number = num)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // 버튼 (누를 때 터치 효과가 기본 내장된 Material3 Button 사용)
         Button(
-            onClick = { viewModel.generateSmartNumbers() },
-            modifier = Modifier.fillMaxWidth()
+            onClick = { viewModel.generateAnalyzedNumbers() },
+            modifier = Modifier.fillMaxWidth(),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 8.dp)
         ) {
-            Text(text = "스마트 분석 번호 추출")
+            Text(text = "분석 번호 추출하기", fontSize = 16.sp, modifier = Modifier.padding(vertical = 4.dp))
         }
 
         if (numbers.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(
                 onClick = { viewModel.saveNumbers() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                elevation = ButtonDefaults.buttonElevation(pressedElevation = 4.dp)
             ) {
-                Text(text = "이 번호 저장하기")
+                Text(text = "분석 번호 저장하기")
             }
         }
+    }
+
+    // 상세 설정 팝업 (Dialog)
+    if (showDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text(text = "상세 분석 조건 설정") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = "번호를 쉼표(,)로 구분해서 입력해주세요. (예: 7, 14, 28)")
+                    
+                    OutlinedTextField(
+                        value = includeInput,
+                        onValueChange = { viewModel.setIncludeInput(it) },
+                        label = { Text("반드시 포함할 고정수") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = excludeInput,
+                        onValueChange = { viewModel.setExcludeInput(it) },
+                        label = { Text("제외할 번호") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showDialog = false }
+                ) {
+                    Text("적용하기")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDialog = false }
+                ) {
+                    Text("취소")
+                }
+            }
+        )
     }
 }
 
 @Composable
-fun LottoBallItem(number: Int) {
+fun AnalysisBallItem(number: Int) {
     val ballColor = when (number) {
         in 1..10 -> Color(0xFFFBC02D)
         in 11..20 -> Color(0xFF1E88E5)
@@ -129,4 +225,3 @@ fun LottoBallItem(number: Int) {
         )
     }
 }
-
