@@ -1,4 +1,4 @@
-// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisViewModel.kt
+// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisViewModel.kt
 package com.example.lotto.ui.analysis
 
 import android.app.Application
@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.net.URL
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -21,7 +22,6 @@ class AnalysisViewModel @Inject constructor(
     application: Application
 ) : AndroidViewModel(application) {
 
-    // 내역 화면과 동일한 SharedPreferences 파일명 및 키 사용
     private val sharedPreferences = application.getSharedPreferences("lotto_saved_prefs", Context.MODE_PRIVATE)
 
     private val _numberSets = MutableStateFlow<List<List<Int>>>(emptyList())
@@ -53,7 +53,8 @@ class AnalysisViewModel @Inject constructor(
                     URL(urlString).readText()
                 }
 
-                val jsonObject = JSONObject(responseJson)
+                // JSONObject 생성 시그니처 명확화
+                val jsonObject = JSONObject(responseJson as String)
                 if (jsonObject.getString("returnValue") == "success") {
                     val nums = listOf(
                         jsonObject.getInt("drwtNo1"),
@@ -104,7 +105,6 @@ class AnalysisViewModel @Inject constructor(
         _numberSets.value = generatedSets
     }
 
-    // 메인 화면 번호 저장 기능 (SharedPreferences에 정확한 키로 누적 저장)
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
@@ -115,13 +115,11 @@ class AnalysisViewModel @Inject constructor(
                 mutableSet.add(numbers.joinToString(","))
             }
             
-            // apply() 대신 commit()을 사용하여 즉시 디스크에 반영되도록 보장
             sharedPreferences.edit().putStringSet("saved_number_sets", mutableSet).commit()
             _saveMessage.value = "성공적으로 ${current.size}개의 조합이 저장되었습니다!"
         }
     }
 
-    // 운세 화면 등 외부에서 직접 번호 세트를 전달받아 저장할 수 있는 공용 함수
     fun saveExternalNumbers(sets: List<List<Int>>) {
         if (sets.isNotEmpty()) {
             val existing = sharedPreferences.getStringSet("saved_number_sets", mutableSetOf()) ?: mutableSetOf()
