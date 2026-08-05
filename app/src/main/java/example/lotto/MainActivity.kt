@@ -24,6 +24,7 @@ import com.example.lotto.ui.analysis.AnalysisViewModel
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.history.HistoryViewModel
 import com.example.lotto.ui.qr.QrScanScreen
+import dagger.hilt.android.AndroidEntryPoint
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Analysis : Screen("analysis", "분석", Icons.Default.Settings)
@@ -32,6 +33,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object History : Screen("history", "내역", Icons.Default.List)
 }
 
+@AndroidEntryPoint // <--- Hilt 뷰모델 주입을 위해 반드시 필요합니다!
 class MainActivity : ComponentActivity() {
 
     private val analysisViewModel: AnalysisViewModel by viewModels()
