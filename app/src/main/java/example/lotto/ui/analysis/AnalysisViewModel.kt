@@ -71,7 +71,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     fun generateSmartNumbers(setCount: Int) {
-        val generatedSets = mutableListOf<List<Int>>()
+        val generatedSets = mutableListof<List<Int>>()
         val latestWin = _latestWinNumbers.value
 
         for (i in 0 until setCount) {
