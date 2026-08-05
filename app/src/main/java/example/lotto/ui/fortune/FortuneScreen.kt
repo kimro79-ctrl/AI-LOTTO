@@ -2,7 +2,9 @@
 package com.example.lotto.ui.fortune
 
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,9 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,8 +75,9 @@ fun FortuneScreen(
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
+        // 조합 개수 선택 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -99,20 +104,30 @@ fun FortuneScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Button(
-            onClick = { viewModel.drawTarotCard(selectedSetCount) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+        Text(
+            text = "아래 3장의 카드 중 오늘의 운세를 담은 한 장을 선택하세요",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Gray,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 사용자가 직접 고를 수 있는 카드 3장 배치
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Text(text = "타로 카드 뽑기 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            for (i in 1..3) {
+                CardBackItem(cardIndex = i) {
+                    viewModel.selectTarotCard(selectedSetCount)
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (generatedTarotSets.isNotEmpty()) {
             Button(
@@ -125,7 +140,7 @@ fun FortuneScreen(
             ) {
                 Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
         LazyColumn(
@@ -186,17 +201,45 @@ fun FortuneScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp),
+                            .height(150.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "버튼을 눌러 오늘의 타로 카드를 뽑아보세요",
+                            text = "카드를 터치하여 운세를 확인하세요",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CardBackItem(cardIndex: Int, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(width = 95.dp, height = 135.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF512DA8))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "TAROT",
+                color = Color.Gold,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "카드 $cardIndex",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp
+            )
         }
     }
 }
