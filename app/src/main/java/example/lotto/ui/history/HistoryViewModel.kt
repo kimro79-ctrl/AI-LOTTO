@@ -29,5 +29,11 @@ class HistoryViewModel @Inject constructor(
             repository.deleteLotto(id)
         }
     }
-}
 
+    // --- 전체 삭제 함수 추가 ---
+    fun deleteAllHistory() {
+        viewModelScope.launch {
+            repository.deleteAllLotto() // 리포지토리에 전체 삭제 함수 호출
+        }
+    }
+}
