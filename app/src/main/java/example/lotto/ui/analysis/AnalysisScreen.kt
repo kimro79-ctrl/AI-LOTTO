@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -116,13 +115,7 @@ fun AnalysisScreen(
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Save,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("내역 저장", fontSize = 13.sp)
+                            Text("내역 저장", fontSize = 13.sp, color = Color.White)
                         }
                     }
                 }
@@ -268,12 +261,13 @@ fun SmartPatternAnalysisSection(
                     containerColor = Color(0xFF0EA5E9)
                 )
             ) {
-                Icon(imageVector = Icons.Default.Star, contentDescription = null)
+                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "AI 추천 번호 생성하기",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
         }
