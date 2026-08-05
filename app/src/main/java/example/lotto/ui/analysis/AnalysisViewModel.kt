@@ -24,7 +24,7 @@ import kotlin.random.Random
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
     application: Application,
-    private val repository: LottoRepository // DB 저장소 주입
+    private val repository: LottoRepository
 ) : AndroidViewModel(application) {
 
     private val _numberSets = MutableStateFlow<List<List<Int>>>(emptyList())
@@ -128,7 +128,6 @@ class AnalysisViewModel @Inject constructor(
         _numberSets.value = generatedSets
     }
 
-    // Room DB를 통해 내역 화면에 즉시 반영되도록 저장 로직 수정
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
