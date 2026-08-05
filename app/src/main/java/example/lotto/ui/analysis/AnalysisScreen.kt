@@ -2,7 +2,6 @@
 package com.example.lotto.ui.analysis
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,10 +10,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,12 +72,12 @@ fun AnalysisScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 1. 최신 당첨 번호 배너 (산뜻한 시안-블루 그라데이션)
+            // 1. 최신 당첨 번호 배너
             item {
                 LatestWinBanner(winNumbers = latestWinNumbers)
             }
 
-            // 2. 스마트 패턴분석 영역 (생성 개수 선택 & 번호 생성 버튼)
+            // 2. 스마트 패턴분석 영역
             item {
                 SmartPatternAnalysisSection(
                     selectedCount = selectedSetCount,
@@ -87,7 +86,7 @@ fun AnalysisScreen(
                 )
             }
 
-            // 3. 조건변경 배너 (스마트 패턴분석 '밑으로' 이동 / 산뜻한 틸-에메랄드 그라데이션)
+            // 3. 조건변경 배너 (스마트 패턴분석 밑으로 이동)
             item {
                 ConditionChangeBanner(
                     currentCondition = selectedCondition,
@@ -148,7 +147,7 @@ fun AnalysisScreen(
     }
 }
 
-// 최신 당첨 번호 배너 (산뜻한 하늘색 계열)
+// 최신 당첨 번호 배너
 @Composable
 fun LatestWinBanner(winNumbers: List<Int>) {
     Card(
@@ -208,7 +207,7 @@ fun SmartPatternAnalysisSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.AutoAwesome,
+                    imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = Color(0xFF0EA5E9),
                     modifier = Modifier.size(22.dp)
@@ -269,7 +268,7 @@ fun SmartPatternAnalysisSection(
                     containerColor = Color(0xFF0EA5E9)
                 )
             ) {
-                Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null)
+                Icon(imageVector = Icons.Default.Star, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "AI 추천 번호 생성하기",
@@ -281,7 +280,7 @@ fun SmartPatternAnalysisSection(
     }
 }
 
-// 스마트 패턴분석 '밑에' 위치하는 조건변경 배너 (산뜻한 민트-에메랄드 그라데이션)
+// 조건변경 배너 (스마트 패턴분석 밑에 위치)
 @Composable
 fun ConditionChangeBanner(
     currentCondition: String,
@@ -320,7 +319,7 @@ fun ConditionChangeBanner(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Tune,
+                            imageVector = Icons.Default.Refresh,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -418,7 +417,7 @@ fun LottoBall(number: Int, size: Int = 36) {
     }
 }
 
-// 조건 선택 바텀시트/다이얼로그
+// 조건 선택 다이얼로그
 @Composable
 fun ConditionSelectDialog(
     currentCondition: String,
