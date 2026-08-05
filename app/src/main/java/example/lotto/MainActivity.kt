@@ -21,12 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.lotto.ui.analysis.AnalysisScreen
+import com.example.lotto.ui.analysis.AnalysisViewModel
 import com.example.lotto.ui.fortune.FortuneScreen
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.qr.QRScannerScreen
@@ -38,7 +40,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            // 커스텀 테마(LottoAppTheme) 대신 기본 MaterialTheme 사용
             MaterialTheme {
                 MainScreen()
             }
@@ -51,7 +52,6 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
-    // 기본 내장 아이콘으로 변경
     object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Build)
     object Fortune : BottomNavItem("fortune", "운세", Icons.Default.Favorite)
     object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.Search)
@@ -61,6 +61,10 @@ sealed class BottomNavItem(
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
+    
+    // Hilt 뷰모델을 공유하여 분석 화면과 운세 화면에서 공용으로 저장 기능 활용
+    val analysisViewModel: AnalysisViewModel = hiltViewModel()
+
     val navItems = listOf(
         BottomNavItem.Analysis,
         BottomNavItem.Fortune,
@@ -106,10 +110,14 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(BottomNavItem.Analysis.route) {
-                AnalysisScreen()
+                AnalysisScreen(viewModel = analysisViewModel)
             }
             composable(BottomNavItem.Fortune.route) {
-                FortuneScreen()
+                FortuneScreen(
+                    onSaveNumbers = { sets, _ ->
+                        analysisViewModel.saveExternalNumbers(sets)
+                    }
+                )
             }
             composable(BottomNavItem.QRScan.route) {
                 QRScannerScreen()
