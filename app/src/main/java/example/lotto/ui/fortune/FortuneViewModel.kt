@@ -17,76 +17,58 @@ class FortuneViewModel @Inject constructor(
     private val repository: LottoRepository
 ) : ViewModel() {
 
-    private val _fortuneTitle = MutableStateFlow<String?>(null)
-    val fortuneTitle: StateFlow<String?> = _fortuneTitle.asStateFlow()
+    private val _tarotCardName = MutableStateFlow<String?>(null)
+    val tarotCardName: StateFlow<String?> = _tarotCardName.asStateFlow()
 
-    private val _fortuneResult = MutableStateFlow<String?>(null)
-    val fortuneResult: StateFlow<String?> = _fortuneResult.asStateFlow()
+    private val _tarotMeaning = MutableStateFlow<String?>(null)
+    val tarotMeaning: StateFlow<String?> = _tarotMeaning.asStateFlow()
 
-    private val _fortuneDetails = MutableStateFlow<String?>(null)
-    val fortuneDetails: StateFlow<String?> = _fortuneDetails.asStateFlow()
-
-    private val _generatedFortuneSets = MutableStateFlow<List<List<Int>>>(emptyList())
-    val generatedFortuneSets: StateFlow<List<List<Int>>> = _generatedFortuneSets.asStateFlow()
+    private val _generatedTarotSets = MutableStateFlow<List<List<Int>>>(emptyList())
+    val generatedTarotSets: StateFlow<List<List<Int>>> = _generatedTarotSets.asStateFlow()
 
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
-    private val heavenlyStems = listOf("갑", "을", "병", "정", "무", "기", "경", "신", "임", "계")
-    private val earthlyBranches = listOf("자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해")
+    private val tarotDeck = listOf(
+        Pair("0. 바보 (The Fool)", "새로운 도전과 무한한 가능성, 뜻밖의 행운이 찾아오는 기운입니다."),
+        Pair("1. 마법사 (The Magician)", "당신의 뛰어난 창의력과 재능으로 원하는 결과를 이뤄내는 형국입니다."),
+        Pair("2. 여사제 (The High Priestess)", "깊은 직관력과 통찰력이 빛을 발하여 숨겨진 행운을 찾는 날입니다."),
+        Pair("3. 여황제 (The Empress)", "풍요와 안정, 물질적인 성취와 재물복이 가득 찬 운세입니다."),
+        Pair("4. 황제 (The Emperor)", "확고한 리더십과 결단력으로 큰 성과와 재물을 거머쥐는 기운입니다."),
+        Pair("7. 전차 (The Chariot)", "거침없는 돌파력과 승리의 에너지가 가득하여 과감한 선택이 빛을 봅니다."),
+        Pair("10. 운명의 루비 (Wheel of Fortune)", "인생의 거대한 행운의 흐름이 당신을 향해 완벽하게 회전하고 있습니다."),
+        Pair("19. 태양 (The Sun)", "만물을 비추는 밝은 에너지와 최고의 행운, 대길(大吉)의 기운입니다.")
+    )
 
-    fun calculateSajuFortune(birthInput: String, setCount: Int) {
-        if (birthInput.length != 8) return
-
-        val year = birthInput.substring(0, 4).toIntOrNull() ?: 2000
-        val month = birthInput.substring(4, 6).toIntOrNull() ?: 1
-        val day = birthInput.substring(6, 8).toIntOrNull() ?: 1
-
-        val yearStem = heavenlyStems[(year - 4) % 10]
-        val yearBranch = earthlyBranches[(year - 4) % 12]
-        val monthStem = heavenlyStems[(year * 2 + month) % 10]
-        val monthBranch = earthlyBranches[(month + 1) % 12]
-        val dayStemIndex = (year * 365 + day) % 10
-        val dayBranchIndex = (year * 365 + day) % 12
+    fun drawTarotCard(setCount: Int) {
+        val selectedCard = tarotDeck.random()
         
-        val dayStem = heavenlyStems[dayStemIndex]
-        val dayBranch = earthlyBranches[dayBranchIndex]
+        _tarotCardName.value = "[오늘의 타로: ${selectedCard.first}]"
+        _tarotMeaning.value = selectedCard.second
 
-        val dominantElement = when (dayStem) {
-            "갑", "을" -> "목(木) - 생동하는 성장과 재물"
-            "병", "정" -> "화(火) - 뻗어나가는 열정과 행운"
-            "무", "기" -> "토(土) - 든든한 안정과 횡재수"
-            "경", "신" -> "금(金) - 예리한 직관과 결실"
-            else -> "수(水) - 지혜로운 유연함과 재물 흐름"
-        }
-
-        // 수정됨: 변수와 한글 조사가 붙어있어 중괄호로 정상 처리
-        _fortuneTitle.value = "[${year}년 ${month}월 ${day}일생 만세력 사주 원국]"
-        _fortuneResult.value = "사주 일간(日干)이 $dayStem(${dominantElement})의 기운을 받아 오늘은 재물과 직관력이 크게 열리는 형국입니다."
-        _fortuneDetails.value = "연주(${yearStem}${yearBranch})와 월주(${monthStem}${monthBranch}), 일주(${dayStem}${dayBranch})의 오행 조화가 원만하여 과감한 선택이 좋은 결과로 이어집니다."
-
-        val seed = birthInput.toInt() + dayStemIndex * 100 + dayBranchIndex
         val sets = mutableListOf<List<Int>>()
+        val seed = System.currentTimeMillis()
+
         for (i in 0 until setCount) {
+            val setRandom = Random(seed + i * 99)
             val resultSet = mutableSetOf<Int>()
-            val setRandom = Random(seed + i * 73 + System.currentTimeMillis())
 
             while (resultSet.size < 6) {
                 resultSet.add(setRandom.nextInt(1, 46))
             }
             sets.add(resultSet.sorted())
         }
-        _generatedFortuneSets.value = sets
+        _generatedTarotSets.value = sets
     }
 
-    fun saveAllFortuneNumbers() {
-        val currentSets = _generatedFortuneSets.value
+    fun saveAllTarotNumbers() {
+        val currentSets = _generatedTarotSets.value
         if (currentSets.isNotEmpty()) {
             viewModelScope.launch {
                 currentSets.forEach { numbers ->
-                    repository.insertLotto(numbers, "FORTUNE")
+                    repository.insertLotto(numbers, "TAROT")
                 }
-                _saveMessage.value = "성공적으로 ${currentSets.size}개의 운세 조합이 내역에 저장되었습니다!"
+                _saveMessage.value = "성공적으로 ${currentSets.size}개의 타로 운세 조합이 내역에 저장되었습니다!"
             }
         }
     }
