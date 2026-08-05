@@ -1,0 +1,79 @@
+// File Path: app/src/main/java/com/example/lotto/ui/tarot/TarotViewModel.kt
+package com.example.lotto.ui.tarot
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.lotto.data.repository.LottoRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import kotlin.random.Random
+
+@HiltViewModel
+class TarotViewModel @Inject constructor(
+    private val repository: LottoRepository
+) : ViewModel() {
+
+    private val _tarotCardName = MutableStateFlow<String?>(null)
+    val tarotCardName: StateFlow<String?> = _tarotCardName.asStateFlow()
+
+    private val _tarotMeaning = MutableStateFlow<String?>(null)
+    val tarotMeaning: StateFlow<String?> = _tarotMeaning.asStateFlow()
+
+    private val _generatedTarotSets = MutableStateFlow<List<List<Int>>>(emptyList())
+    val generatedTarotSets: StateFlow<List<List<Int>>> = _generatedTarotSets.asStateFlow()
+
+    private val _saveMessage = MutableStateFlow<String?>(null)
+    val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
+
+    private val tarotDeck = listOf(
+        Pair("0. 바보 (The Fool)", "새로운 도전과 무한한 가능성, 뜻밖의 행운이 찾아오는 기운입니다."),
+        Pair("1. 마법사 (The Magician)", "당신의 뛰어난 창의력과 재능으로 원하는 결과를 이뤄내는 형국입니다."),
+        Pair("2. 여사제 (The High Priestess)", "깊은 직관력과 통찰력이 빛을 발하여 숨겨진 행운을 찾는 날입니다."),
+        Pair("3. 여황제 (The Empress)", "풍요와 안정, 물질적인 성취와 재물복이 가득 찬 운세입니다."),
+        Pair("4. 황제 (The Emperor)", "확고한 리더십과 결단력으로 큰 성과와 재물을 거머쥐는 기운입니다."),
+        Pair("7. 전차 (The Chariot)", "거침없는 돌파력과 승리의 에너지가 가득하여 과감한 선택이 빛을 봅니다."),
+        Pair("10. 운명의 루비 (Wheel of Fortune)", "인생의 거대한 행운의 흐름이 당신을 향해 완벽하게 회전하고 있습니다."),
+        Pair("19. 태양 (The Sun)", "만물을 비추는 밝은 에너지와 최고의 행운, 대길(大吉)의 기운입니다.")
+    )
+
+    fun drawTarotCard(setCount: Int) {
+        val selectedCard = tarotDeck.random()
+        
+        _tarotCardName.value = "[오늘의 타로: ${selectedCard.first}]"
+        _tarotMeaning.value = selectedCard.second
+
+        val sets = mutableListOf<List<Int>>()
+        val seed = System.currentTimeMillis()
+
+        for (i in 0 until setCount) {
+            val setRandom = Random(seed + i * 99)
+            val resultSet = mutableSetOf<Int>()
+
+            while (resultSet.size < 6) {
+                resultSet.add(setRandom.nextInt(1, 46))
+            }
+            sets.add(resultSet.sorted())
+        }
+        _generatedTarotSets.value = sets
+    }
+
+    fun saveAllTarotNumbers() {
+        val currentSets = _generatedTarotSets.value
+        if (currentSets.isNotEmpty()) {
+            viewModelScope.launch {
+                currentSets.forEach { numbers ->
+                    repository.insertLotto(numbers, "TAROT")
+                }
+                _saveMessage.value = "성공적으로 ${currentSets.size}개의 타로 운세 조합이 내역에 저장되었습니다!"
+            }
+        }
+    }
+
+    fun clearSaveMessage() {
+        _saveMessage.value = null
+    }
+}
