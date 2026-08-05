@@ -63,16 +63,15 @@ fun AnalysisScreen(
         },
         containerColor = Color(0xFFF1F5F9)
     ) { paddingValues ->
-        // 번호 생성 시 카드들이 아래로 차곡차곡 쌓이며 위아래로 스크롤되는 영역
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 1. 상단 최신 당첨 번호 배너
+            // 1. 회차 표시 배너 (1235회 당첨 번호)
             item {
                 LatestWinBanner(winNumbers = latestWinNumbers)
             }
@@ -98,9 +97,10 @@ fun AnalysisScreen(
                 )
             }
 
-            // 4. 생성된 번호 조합 리스트 (카드 섹션 스크롤)
+            // 4. 생성된 번호 조합 리스트 (카드 섹션)
             if (numberSets.isNotEmpty()) {
                 item {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -132,7 +132,6 @@ fun AnalysisScreen(
         }
     }
 
-    // 조건 선택 다이얼로그
     if (showConditionDialog) {
         ConditionSelectDialog(
             currentCondition = selectedCondition,
@@ -145,7 +144,7 @@ fun AnalysisScreen(
     }
 }
 
-// 상단 최신 당첨 번호 배너
+// 회차 정보가 포함된 상단 배너 (1235회 당첨 번호)
 @Composable
 fun LatestWinBanner(winNumbers: List<Int>) {
     Card(
@@ -160,23 +159,23 @@ fun LatestWinBanner(winNumbers: List<Int>) {
                         colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
                     )
                 )
-                .padding(18.dp)
+                .padding(16.dp)
         ) {
             Column {
                 Text(
-                    text = "최신 회차 당첨 번호",
+                    text = "1235회 당첨 번호",
                     color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     winNumbers.forEach { number ->
-                        LottoBall(number = number, size = 38)
+                        LottoBall(number = number, size = 36)
                     }
                 }
             }
@@ -184,7 +183,6 @@ fun LatestWinBanner(winNumbers: List<Int>) {
     }
 }
 
-// 스마트 패턴 분석 섹션
 @Composable
 fun SmartPatternAnalysisSection(
     selectedCount: Int,
@@ -198,8 +196,8 @@ fun SmartPatternAnalysisSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically
@@ -208,25 +206,24 @@ fun SmartPatternAnalysisSection(
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
                     tint = Color(0xFF0EA5E9),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "스마트 패턴 분석",
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A)
                 )
             }
 
             Text(
-                text = "최신 당첨 이월 패턴, 홀짝 균형, 고저 비율 필터를 실시간 반영하여 최적의 번호를 추출합니다.",
-                fontSize = 13.sp,
+                text = "최신 당첨 이월 패턴, 홀짝 균형, 고저 비율 필터를 실시간 반영합니다.",
+                fontSize = 12.sp,
                 color = Color(0xFF64748B),
-                lineHeight = 18.sp
+                lineHeight = 16.sp
             )
 
-            // 조합 수 선택 버튼 (5개 / 10개)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -252,28 +249,28 @@ fun SmartPatternAnalysisSection(
                     ) {
                         Text(
                             text = "${count}개 조합",
+                            fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
             }
 
-            // 번호 생성 실행 버튼
             Button(
                 onClick = onGenerateClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .height(46.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF0EA5E9)
                 )
             ) {
-                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
+                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "AI 추천 번호 생성하기",
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -282,7 +279,6 @@ fun SmartPatternAnalysisSection(
     }
 }
 
-// 조건변경 배너
 @Composable
 fun ConditionChangeBanner(
     currentCondition: String,
@@ -303,7 +299,7 @@ fun ConditionChangeBanner(
                         colors = listOf(Color(0xFF0D9488), Color(0xFF10B981))
                     )
                 )
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -316,7 +312,7 @@ fun ConditionChangeBanner(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(32.dp)
                             .background(Color.White.copy(alpha = 0.2f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -324,19 +320,19 @@ fun ConditionChangeBanner(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
                             text = "적용된 분석 조건",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                         Text(
                             text = currentCondition,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
@@ -350,9 +346,9 @@ fun ConditionChangeBanner(
                     Text(
                         text = "변경",
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -360,7 +356,6 @@ fun ConditionChangeBanner(
     }
 }
 
-// 번호 조합 세트 카드 (카드 섹션 형태 및 스크롤 지원)
 @Composable
 fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
     Card(
@@ -372,7 +367,7 @@ fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -380,28 +375,27 @@ fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
                 text = "${setIndex}세트",
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF64748B),
-                fontSize = 14.sp
+                fontSize = 13.sp
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 numbers.forEach { number ->
-                    LottoBall(number = number, size = 34)
+                    LottoBall(number = number, size = 32)
                 }
             }
         }
     }
 }
 
-// 로또 공 UI 컴포넌트
 @Composable
-fun LottoBall(number: Int, size: Int = 36) {
+fun LottoBall(number: Int, size: Int = 34) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFF59E0B)  // 노랑
-        in 11..20 -> Color(0xFF3B82F6) // 파랑
-        in 21..30 -> Color(0xFFEF4444) // 빨강
-        in 31..40 -> Color(0xFF64748B) // 회색
-        else -> Color(0xFF10B981)      // 초록
+        in 1..10 -> Color(0xFFF59E0B)
+        in 11..20 -> Color(0xFF3B82F6)
+        in 21..30 -> Color(0xFFEF4444)
+        in 31..40 -> Color(0xFF64748B)
+        else -> Color(0xFF10B981)
     }
 
     Box(
@@ -414,12 +408,11 @@ fun LottoBall(number: Int, size: Int = 36) {
             text = number.toString(),
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = (size / 2.6).sp
+            fontSize = (size / 2.5).sp
         )
     }
 }
 
-// 조건 선택 다이얼로그
 @Composable
 fun ConditionSelectDialog(
     currentCondition: String,
