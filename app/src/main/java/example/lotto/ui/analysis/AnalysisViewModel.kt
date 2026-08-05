@@ -14,14 +14,18 @@ import kotlin.random.Random
 @HiltViewModel
 class AnalysisViewModel @Inject constructor() : ViewModel() {
 
-    private val _numbers = MutableStateFlow<List<Int>>(emptyList())
-    val numbers: StateFlow<List<Int>> = _numbers.asStateFlow()
+    private val _numberSets = MutableStateFlow<List<List<Int>>>(emptyList())
+    val numberSets: StateFlow<List<List<Int>>> = _numberSets.asStateFlow()
 
     private val _includeInput = MutableStateFlow("")
     val includeInput: StateFlow<String> = _includeInput.asStateFlow()
 
     private val _excludeInput = MutableStateFlow("")
     val excludeInput: StateFlow<String> = _excludeInput.asStateFlow()
+
+    // 1235회 실제 당첨 번호 반영
+    private val _latestWinNumbers = MutableStateFlow(listOf(6, 7, 11, 15, 39, 43))
+    val latestWinNumbers: StateFlow<List<Int>> = _latestWinNumbers.asStateFlow()
 
     fun setIncludeInput(value: String) {
         _includeInput.value = value
@@ -31,7 +35,7 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
         _excludeInput.value = value
     }
 
-    fun generateSmartNumbers() {
+    fun generateSmartNumbers(countMode: Int) {
         val includeList = _includeInput.value
             .split(",")
             .mapNotNull { it.trim().toIntOrNull() }
@@ -42,24 +46,29 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
             .mapNotNull { it.trim().toIntOrNull() }
             .filter { it in 1..45 }
 
-        val resultSet = mutableSetOf<Int>()
-        resultSet.addAll(includeList.take(10))
+        val generatedSets = mutableListOf<List<Int>>()
+        
+        for (i in 0 until 5) {
+            val resultSet = mutableSetOf<Int>()
+            resultSet.addAll(includeList.take(countMode))
 
-        while (resultSet.size < 10) {
-            val candidate = Random.nextInt(1, 46)
-            if (!excludeList.contains(candidate)) {
-                resultSet.add(candidate)
+            while (resultSet.size < countMode) {
+                val candidate = Random.nextInt(1, 46)
+                if (!excludeList.contains(candidate)) {
+                    resultSet.add(candidate)
+                }
             }
+            generatedSets.add(resultSet.sorted())
         }
 
-        _numbers.value = resultSet.sorted()
+        _numberSets.value = generatedSets
     }
 
     fun saveNumbers() {
-        val current = _numbers.value
+        val current = _numberSets.value
         if (current.isNotEmpty()) {
             viewModelScope.launch {
-                // 저장 로직
+                // 저장 로직 구현
             }
         }
     }
