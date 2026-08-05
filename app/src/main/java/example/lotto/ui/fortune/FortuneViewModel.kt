@@ -60,7 +60,8 @@ class FortuneViewModel @Inject constructor(
             else -> "수(水) - 지혜로운 유연함과 재물 흐름"
         }
 
-        _fortuneTitle.value = "[$year년 ${month}월 ${day}일생 만세력 사주 원국]"
+        // 수정됨: 변수와 한글 조사가 붙어있어 중괄호로 정상 처리
+        _fortuneTitle.value = "[${year}년 ${month}월 ${day}일생 만세력 사주 원국]"
         _fortuneResult.value = "사주 일간(日干)이 $dayStem(${dominantElement})의 기운을 받아 오늘은 재물과 직관력이 크게 열리는 형국입니다."
         _fortuneDetails.value = "연주(${yearStem}${yearBranch})와 월주(${monthStem}${monthBranch}), 일주(${dayStem}${dayBranch})의 오행 조화가 원만하여 과감한 선택이 좋은 결과로 이어집니다."
 
