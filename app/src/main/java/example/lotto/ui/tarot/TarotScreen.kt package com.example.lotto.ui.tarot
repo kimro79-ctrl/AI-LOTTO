@@ -73,6 +73,7 @@ fun TarotScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // 파스텔톤 배너 버튼 영역 (5개 조합 / 10개 조합)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -80,22 +81,30 @@ fun TarotScreen(
             Button(
                 onClick = { selectedSetCount = 5 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedSetCount == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = if (selectedSetCount == 5) Color(0xFFD0BFFF) else Color(0xFFF0EDFF) // 파스텔 연보라 / 연한 회보라
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "5개 조합", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "5개 조합",
+                    fontWeight = FontWeight.Bold,
+                    color = if (selectedSetCount == 5) Color(0xFF333333) else Color(0xFF777777)
+                )
             }
             Button(
                 onClick = { selectedSetCount = 10 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedSetCount == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = if (selectedSetCount == 10) Color(0xFFFFC6FF) else Color(0xFFFFF0F5) // 파스텔 연분홍 / 연한 핑크
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "10개 조합", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "10개 조합",
+                    fontWeight = FontWeight.Bold,
+                    color = if (selectedSetCount == 10) Color(0xFF333333) else Color(0xFF777777)
+                )
             }
         }
 
@@ -106,10 +115,11 @@ fun TarotScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA0C4FF)), // 파스텔 블루톤 메인 버튼
             shape = RoundedCornerShape(12.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            Text(text = "타로 카드 뽑기 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(text = "타로 카드 뽑기 및 행운 번호 추출", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF222222))
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -120,10 +130,10 @@ fun TarotScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCAFFBF)), // 파스텔 그린톤 저장 버튼
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF222222))
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -138,7 +148,7 @@ fun TarotScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDFFB6)), // 파스텔 노랑톤 타로 카드 결과 박스
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
@@ -146,11 +156,11 @@ fun TarotScreen(
                             Text(
                                 text = tarotCardName ?: "",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = Color(0xFF555555),
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(text = tarotMeaning ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(text = tarotMeaning ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF444444))
                         }
                     }
                 }
@@ -158,7 +168,7 @@ fun TarotScreen(
                 itemsIndexed(generatedTarotSets) { index, numbers ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE4C1F9)), // 파스텔 라벤더톤 조합 결과 카드
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -166,7 +176,7 @@ fun TarotScreen(
                             Text(
                                 text = "타로 맞춤 조합 ${index + 1}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.Gray,
+                                color = Color(0xFF666666),
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -204,11 +214,11 @@ fun TarotScreen(
 @Composable
 fun TarotBallItem(number: Int, size: Int) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFFBC02D)
-        in 11..20 -> Color(0xFF1E88E5)
-        in 21..30 -> Color(0xFFE53935)
-        in 31..40 -> Color(0xFF757575)
-        else -> Color(0xFF43A047)
+        in 1..10 -> Color(0xFFFFD166) // 파스텔 골드/옐로
+        in 11..20 -> Color(0xFF9BF6FF) // 파스텔 블루
+        in 21..30 -> Color(0xFFFFADAD) // 파스텔 레드/핑크
+        in 31..40 -> Color(0xFFBDB2FF) // 파스텔 퍼플
+        else -> Color(0xFFCAFFBF) // 파스텔 그린
     }
 
     Box(
@@ -219,10 +229,9 @@ fun TarotBallItem(number: Int, size: Int) {
     ) {
         Text(
             text = number.toString(),
-            color = Color.White,
+            color = Color(0xFF333333),
             fontWeight = FontWeight.Bold,
             fontSize = (size * 0.38).sp
         )
     }
 }
-
