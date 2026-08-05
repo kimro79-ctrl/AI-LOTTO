@@ -38,7 +38,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            // 커스텀 테마(LottoAppTheme) 대신 기본 MaterialTheme 사용
             MaterialTheme {
                 MainScreen()
             }
@@ -51,7 +50,6 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
-    // 기본 내장 아이콘으로 변경
     object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Build)
     object Fortune : BottomNavItem("fortune", "운세", Icons.Default.Favorite)
     object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.Search)
