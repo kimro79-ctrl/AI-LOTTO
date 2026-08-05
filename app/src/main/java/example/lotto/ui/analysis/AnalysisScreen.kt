@@ -1,4 +1,4 @@
-// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisScreen.kt
+// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisScreen.kt
 package com.example.lotto.ui.analysis
 
 import androidx.compose.foundation.background
@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.sp
 fun AnalysisScreen(
     viewModel: AnalysisViewModel
 ) {
-    val latestDrawInfo by viewModel.latestDrawInfo.collectAsState() // 회차 및 날짜 정보
-    val generatedLottoLists by viewModel.generatedLottoLists.collectAsState() // 생성된 번호 리스트 (카드 스크롤용)
+    // 기존 ViewModel에 정의된 상태 변수명들에 맞춤
+    val drawNumber by viewModel.drawNumber.collectAsState()
+    val drawDate by viewModel.drawDate.collectAsState()
+    val lottoLists by viewModel.lottoLists.collectAsState()
 
     Column(
         modifier = Modifier
@@ -29,7 +31,7 @@ fun AnalysisScreen(
             .background(Color(0xFFF8FAFC))
             .padding(16.dp)
     ) {
-        // 1. 상단 회차별 최신 날짜 및 당첨번호 안내 영역
+        // 1. 상단 회차 및 날짜 표시 영역 (요청하신 "1235회 당첨번호" 형태)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -40,15 +42,15 @@ fun AnalysisScreen(
                 modifier = Modifier.padding(20.dp)
             ) {
                 Text(
-                    text = "${latestDrawInfo.drawNo}회 당첨번호",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                    text = "${drawNumber}회 당첨번호",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1E293B)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = latestDrawInfo.drawDate, // 예: 2026.06.07 추첨 등
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    text = drawDate,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF64748B)
                 )
             }
@@ -56,9 +58,9 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 번호 생성 버튼 (기존 기능 유지)
+        // 번호 생성 버튼 (기존 함수명 generateLottoNumbers 사용)
         Button(
-            onClick = { viewModel.generateNumbers() },
+            onClick = { viewModel.generateLottoNumbers() },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9)),
             shape = RoundedCornerShape(12.dp)
@@ -75,7 +77,7 @@ fun AnalysisScreen(
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(generatedLottoLists) { numbers ->
+            items(lottoLists) { numbers ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -90,7 +92,7 @@ fun AnalysisScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         numbers.forEach { number ->
-                            LottoBall(number = number)
+                            LottoBallItem(number = number)
                         }
                     }
                 }
@@ -100,7 +102,7 @@ fun AnalysisScreen(
 }
 
 @Composable
-fun LottoBall(number: Int) {
+fun LottoBallItem(number: Int) {
     val ballColor = when (number) {
         in 1..10 -> Color(0xFFFBC02D)
         in 11..20 -> Color(0xFF1E88E5)
