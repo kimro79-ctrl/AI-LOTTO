@@ -1,176 +1,90 @@
-// File Path: app/src/main/java/com/example/lotto/ui/qr/QRScannerScreen.kt
+// File Path: app/src/main/java/example/lotto/ui/qr/QrScanScreen.kt
 package com.example.lotto.ui.qr
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.util.Size
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
-import java.util.concurrent.Executors
+import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QRScannerScreen(
-    onQrScanned: (String) -> Unit = {}
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var hasPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var scannedResult by remember { mutableStateOf("") }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            hasPermission = granted
-        }
-    )
-
-    LaunchedEffect(Unit) {
-        if (!hasPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    Scaffold { innerPadding ->
+fun QrScanScreen() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "QR 당첨 확인",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B)
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFF8FAFC)
+                )
+            )
+        },
+        containerColor = Color(0xFFF1F5F9)
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
         ) {
-            if (hasPermission) {
-                AndroidView(
-                    factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-
-                        cameraProviderFuture.addListener({
-                            val cameraProvider = cameraProviderFuture.get()
-                            val preview = Preview.Builder().build().also {
-                                it.setSurfaceProvider(previewView.surfaceProvider)
-                            }
-
-                            val imageAnalysis = ImageAnalysis.Builder()
-                                .setTargetResolution(Size(1280, 720))
-                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                .build()
-
-                            imageAnalysis.setAnalyzer(
-                                Executors.newSingleThreadExecutor()
-                            ) { imageProxy ->
-                                processImageProxy(imageProxy) { result ->
-                                    scannedResult = result
-                                    onQrScanned(result)
-                                }
-                            }
-
-                            try {
-                                cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    CameraSelector.DEFAULT_BACK_CAMERA,
-                                    preview,
-                                    imageAnalysis
-                                )
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }, ContextCompat.getMainExecutor(ctx))
-
-                        previewView
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                if (scannedResult.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .align(Alignment.BottomCenter),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.padding(24.dp)
+            ) {
+                // 작고 세련된 QR 스캔 가이드 박스 영역
+                Box(
+                    modifier = Modifier
+                        .size(260.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xFFE2E8F0))
+                        .border(2.dp, Color(0xFF0EA5E9), RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = Color(0xFF0EA5E9),
+                            modifier = Modifier.size(48.dp)
+                        )
                         Text(
-                            text = "인식된 QR 코드: $scannedResult",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "로또 용지 QR코드를\n사각 박스 안에 맞춰주세요",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
                         )
                     }
                 }
-            } else {
+
                 Text(
-                    text = "QR 스캔을 위해 카메라 권한이 필요합니다.",
-                    modifier = Modifier.align(Alignment.Center)
+                    text = "자동으로 당첨 결과가 스캔됩니다",
+                    fontSize = 13.sp,
+                    color = Color(0xFF94A3B8)
                 )
             }
         }
     }
 }
-
-@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-private fun processImageProxy(
-    imageProxy: ImageProxy,
-    onResult: (String) -> Unit
-) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(
-            mediaImage,
-            imageProxy.imageInfo.rotationDegrees
-        )
-        val scanner = BarcodeScanning.getClient()
-
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    if (barcode.valueType == Barcode.TYPE_URL || barcode.valueType == Barcode.TYPE_TEXT) {
-                        barcode.rawValue?.let { value ->
-                            onResult(value)
-                        }
-                    }
-                }
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    } else {
-        imageProxy.close()
-    }
-}
-
