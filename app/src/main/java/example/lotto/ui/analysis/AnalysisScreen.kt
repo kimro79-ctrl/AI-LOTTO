@@ -35,6 +35,9 @@ fun AnalysisScreen(
     val selectedCondition by viewModel.selectedCondition.collectAsState()
     val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
+    
+    // 회차 정보 상태 수신 (ViewModel에 최신 회차 번호가 담긴 변수 연결)
+    val latestDrawNo by viewModel.latestDrawNo.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
@@ -63,7 +66,7 @@ fun AnalysisScreen(
         },
         containerColor = Color(0xFFF1F5F9)
     ) { paddingValues ->
-        // 전체 화면이 위아래로 스크롤되도록 LazyColumn 사용 (카드 섹션들이 추가되면 자연스럽게 스크롤됨)
+        // 번호 생성 시 카드들이 추가되며 위아래로 스크롤되는 메인 영역
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -72,9 +75,12 @@ fun AnalysisScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 1. 상단 최신 당첨 번호 배너 ("1235회 당첨번호" 형태의 타이틀 반영)
+            // 1. 상단 회차별 최신 당첨번호 영역 ("1235회 당첨번호" 형태)
             item {
-                LatestWinBanner(winNumbers = latestWinNumbers)
+                LatestWinBanner(
+                    drawNo = latestDrawNo,
+                    winNumbers = latestWinNumbers
+                )
             }
 
             // 2. 스마트 패턴분석 영역
@@ -98,7 +104,7 @@ fun AnalysisScreen(
                 )
             }
 
-            // 4. 생성된 번호 조합 리스트 (카드 섹션 형태로 위아래 스크롤)
+            // 4. 생성된 번호 조합 리스트 (카드 섹션들이 쌓이면서 스크롤 작동)
             if (numberSets.isNotEmpty()) {
                 item {
                     Row(
@@ -145,9 +151,9 @@ fun AnalysisScreen(
     }
 }
 
-// 최신 당첨 번호 배너 (요청하신 회차 스타일 타이틀 적용)
+// 상단 최신 당첨 번호 배너 ("1235회 당첨번호" 스타일 반영)
 @Composable
-fun LatestWinBanner(winNumbers: List<Int>) {
+fun LatestWinBanner(drawNo: Int, winNumbers: List<Int>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -164,9 +170,9 @@ fun LatestWinBanner(winNumbers: List<Int>) {
         ) {
             Column {
                 Text(
-                    text = "최신 회차 당첨번호",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
+                    text = "${drawNo}회 당첨번호", // 요청하신 회차 형태 반영
+                    color = Color.White,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -360,7 +366,7 @@ fun ConditionChangeBanner(
     }
 }
 
-// 번호 조합 세트 카드
+// 번호 조합 세트 카드 (카드 섹션 형태로 위아래 스크롤 지원)
 @Composable
 fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
     Card(
