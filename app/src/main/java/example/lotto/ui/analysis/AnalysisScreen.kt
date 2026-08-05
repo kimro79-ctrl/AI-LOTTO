@@ -59,7 +59,7 @@ fun AnalysisScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        // 4. 메인 페이지 최근 당첨번호 배너
+        // 메인 페이지 최근 당첨 번호 배너
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -96,7 +96,6 @@ fun AnalysisScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            // 1. 사용자 분석 설정 팝업 오픈 버튼
             Surface(
                 onClick = { showDialog = true },
                 shape = RoundedCornerShape(8.dp),
@@ -120,7 +119,7 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 2. 5개 설정 / 10개 설정 배너
+        // 5개 설정 / 10개 설정 배너 버튼 (weight 수정 완료)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -130,7 +129,7 @@ fun AnalysisScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedCountMode == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
-                modifier = Modifier.weight(1.dp)
+                modifier = Modifier.weight(1f)
             ) {
                 Text(text = "5개 설정 모드")
             }
@@ -139,7 +138,7 @@ fun AnalysisScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedCountMode == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
-                modifier = Modifier.weight(1.dp)
+                modifier = Modifier.weight(1f)
             ) {
                 Text(text = "10개 설정 모드")
             }
@@ -167,7 +166,7 @@ fun AnalysisScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        numbers.take(6).forEach { num ->
+                        numbers.take(selectedCountMode).forEach { num ->
                             LottoBallItem(number = num)
                         }
                     }
@@ -200,7 +199,6 @@ fun AnalysisScreen(
         }
     }
 
-    // 1. 사용자 분석 설정 팝업 창
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -213,7 +211,7 @@ fun AnalysisScreen(
                     
                     OutlinedTextField(
                         value = includeInput,
-                        onValueChange = { value -> viewModel.setIncludeInput(value) },
+                        onValueChange = { text: String -> viewModel.setIncludeInput(text) },
                         label = { Text("반드시 포함할 고정수") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -221,7 +219,7 @@ fun AnalysisScreen(
 
                     OutlinedTextField(
                         value = excludeInput,
-                        onValueChange = { value -> viewModel.setExcludeInput(value) },
+                        onValueChange = { text: String -> viewModel.setExcludeInput(text) },
                         label = { Text("제외할 번호") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -259,14 +257,14 @@ fun LottoBallItem(number: Int) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(40.dp)
+            .size(36.dp)
             .background(color = ballColor, shape = CircleShape)
     ) {
         Text(
             text = number.toString(),
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp
+            fontSize = 13.sp
         )
     }
 }
