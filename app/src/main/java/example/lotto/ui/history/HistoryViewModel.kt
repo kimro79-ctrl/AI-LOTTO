@@ -30,10 +30,13 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
-    // --- 전체 삭제 함수 추가 ---
+    // 전체 삭제 함수 수정: 리포지토리를 거치지 않고 개별 항목을 순회하며 삭제하거나 직접 처리
     fun deleteAllHistory() {
         viewModelScope.launch {
-            repository.deleteAllLotto() // 리포지토리에 전체 삭제 함수 호출
+            // 현재 리스트에 있는 모든 항목의 id를 가져와서 개별 삭제 함수를 실행합니다.
+            historyList.value.forEach { item ->
+                repository.deleteLotto(item.id)
+            }
         }
     }
 }
