@@ -80,12 +80,16 @@ fun AnalysisScreen(
             item {
                 SmartPatternAnalysisSection(
                     selectedCount = selectedSetCount,
-                    onCountSelected = { selectedSetCount = it },
-                    onGenerateClick = { viewModel.generateSmartNumbers(selectedSetCount) }
+                    onCountSelected = { count ->
+                        selectedSetCount = count
+                    },
+                    onGenerateClick = {
+                        viewModel.generateSmartNumbers(selectedSetCount)
+                    }
                 )
             }
 
-            // 3. 조건변경 배너 (스마트 패턴분석 밑으로 이동)
+            // 3. 조건변경 배너
             item {
                 ConditionChangeBanner(
                     currentCondition = selectedCondition,
@@ -274,7 +278,7 @@ fun SmartPatternAnalysisSection(
     }
 }
 
-// 조건변경 배너 (스마트 패턴분석 밑에 위치)
+// 조건변경 배너
 @Composable
 fun ConditionChangeBanner(
     currentCondition: String,
