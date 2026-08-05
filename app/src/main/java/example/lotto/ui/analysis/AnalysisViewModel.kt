@@ -129,9 +129,10 @@ class AnalysisViewModel @Inject constructor(
         if (current.isNotEmpty()) {
             viewModelScope.launch {
                 current.forEach { numbers ->
-                    repository.insertLotto(numbers, "ANALYSIS")[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)
+                    repository.insertLotto(numbers, "ANALYSIS")
                 }
-                _saveMessage.value = "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
+                _saveMessage.value =
+                    "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
             }
         }
     }
@@ -140,9 +141,10 @@ class AnalysisViewModel @Inject constructor(
         if (sets.isNotEmpty()) {
             viewModelScope.launch {
                 sets.forEach { numbers ->
-                    repository.insertLotto(numbers, "FORTUNE")[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)
+                    repository.insertLotto(numbers, "FORTUNE")
                 }
-                _saveMessage.value = "성공적으로 ${sets.size}개의 조합이 내역에 저장되었습니다!"
+                _saveMessage.value =
+                    "성공적으로 ${sets.size}개의 조합이 내역에 저장되었습니다!"
             }
         }
     }
