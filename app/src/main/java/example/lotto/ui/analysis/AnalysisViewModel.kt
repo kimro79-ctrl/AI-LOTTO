@@ -135,8 +135,8 @@ class AnalysisViewModel @Inject constructor(
                 val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 current.forEach { numbers ->
                     val entity = LottoEntity(
-                        type = "ANALYSIS",
                         numbers = numbers.joinToString(","),
+                        type = "ANALYSIS",
                         date = currentDate
                     )
                     repository.insertLotto(entity)
@@ -152,8 +152,8 @@ class AnalysisViewModel @Inject constructor(
                 val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 sets.forEach { numbers ->
                     val entity = LottoEntity(
-                        type = "FORTUNE",
                         numbers = numbers.joinToString(","),
+                        type = "FORTUNE",
                         date = currentDate
                     )
                     repository.insertLotto(entity)
