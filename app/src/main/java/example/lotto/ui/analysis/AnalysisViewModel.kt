@@ -27,7 +27,6 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
     private val _excludeInput = MutableStateFlow("")
     val excludeInput: StateFlow<String> = _excludeInput.asStateFlow()
 
-    // 최신 당첨 번호 상태 (기본값 설정 후 API로 자동 갱신)
     private val _latestWinNumbers = MutableStateFlow(listOf(6, 7, 11, 15, 39, 43))
     val latestWinNumbers: StateFlow<List<Int>> = _latestWinNumbers.asStateFlow()
 
@@ -43,13 +42,10 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
         _excludeInput.value = value
     }
 
-    // 동행복권 공식 API를 호출하여 가장 최신 당첨 번호와 회차를 자동으로 가져옴
     private fun fetchLatestLottoNumber() {
         viewModelScope.launch {
             try {
-                // 대략적인 최신 회차 추정 후 동적으로 최신 회차 탐색 또는 최근 회차 조회 API 활용
-                // 여기서는 가장 최신 회차 번호(예: 1235회 이상)를 역산하거나 최신 데이터를 가져오는 로직 수행
-                val targetRound = 1235 // 필요에 따라 현재 날짜 기준 계산 혹은 최신 회차 연동
+                val targetRound = 1235
                 val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$targetRound"
                 
                 val responseJson = withContext(Dispatchers.IO) {
@@ -70,12 +66,12 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // 네트워크 오류 시 기본값 유지
             }
         }
     }
 
-    fun generateSmartNumbers(countMode: Int) {
+    // 선택한 세트 수(5개 또는 10개)만큼 조합을 생성
+    fun generateSmartNumbers(setCount: Int) {
         val includeList = _includeInput.value
             .split(",")
             .mapNotNull { it.trim().toIntOrNull() }
@@ -88,11 +84,11 @@ class AnalysisViewModel @Inject constructor() : ViewModel() {
 
         val generatedSets = mutableListOf<List<Int>>()
         
-        for (i in 0 until 5) {
+        for (i in 0 until setCount) {
             val resultSet = mutableSetOf<Int>()
-            resultSet.addAll(includeList.take(countMode))
+            resultSet.addAll(includeList.take(6))
 
-            while (resultSet.size < countMode) {
+            while (resultSet.size < 6) {
                 val candidate = Random.nextInt(1, 46)
                 if (!excludeList.contains(candidate)) {
                     resultSet.add(candidate)
