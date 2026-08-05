@@ -1,27 +1,23 @@
-// File Path: app/src/main/java/example/lotto/MainActivity.kt
-package example.lotto
+// File Path: app/src/main/java/com/example/lotto/MainActivity.kt
+package com.example.lotto
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -29,7 +25,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import example.lotto.ui.analysis.AnalysisScreen
+import com.example.lotto.ui.analysis.AnalysisScreen
+import com.example.lotto.ui.fortune.FortuneScreen
+import com.example.lotto.ui.history.HistoryScreen
+import com.example.lotto.ui.qr.QRScannerScreen
+import com.example.lotto.ui.theme.LottoAppTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            LottoAppTheme {
                 MainScreen()
             }
         }
@@ -50,10 +50,10 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
-    object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Build)
-    object Fortune : BottomNavItem("fortune", "운세", Icons.Default.Favorite)
-    object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.Search)
-    object History : BottomNavItem("history", "내역", Icons.Default.List)
+    object Analysis : BottomNavItem("analysis", "분석", Icons.Default.Analytics)
+    object Fortune : BottomNavItem("fortune", "운세", Icons.Default.AutoAwesome)
+    object QRScan : BottomNavItem("qr_scan", "QR스캔", Icons.Default.QrCodeScanner)
+    object History : BottomNavItem("history", "내역", Icons.Default.History)
 }
 
 @Composable
@@ -116,27 +116,5 @@ fun MainScreen() {
                 HistoryScreen()
             }
         }
-    }
-}
-
-// 임시 대체용 화면 컴포넌트들 (추후 각 파일로 분리 가능)
-@Composable
-fun FortuneScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "운세 화면 준비 중입니다.", style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-@Composable
-fun QRScannerScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "QR 스캔 화면 준비 중입니다.", style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-@Composable
-fun HistoryScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "내역 화면 준비 중입니다.", style = MaterialTheme.typography.titleMedium)
     }
 }
