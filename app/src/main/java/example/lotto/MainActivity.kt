@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,12 +14,13 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.lotto.ui.analysis.AnalysisScreen
 import com.example.lotto.ui.analysis.AnalysisViewModel
+import com.example.lotto.ui.fortune.FortuneScreen
+import com.example.lotto.ui.fortune.FortuneViewModel
 import com.example.lotto.ui.history.HistoryScreen
 import com.example.lotto.ui.history.HistoryViewModel
 import com.example.lotto.ui.qr.QrScanScreen
@@ -33,10 +33,11 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object History : Screen("history", "내역", Icons.Default.List)
 }
 
-@AndroidEntryPoint // <--- Hilt 뷰모델 주입을 위해 반드시 필요합니다!
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val analysisViewModel: AnalysisViewModel by viewModels()
+    private val fortuneViewModel: FortuneViewModel by viewModels()
     private val historyViewModel: HistoryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,11 +89,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (currentScreen) {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
-                            is Screen.Fortune -> {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("운세 화면 준비중", color = Color(0xFF64748B))
-                                }
-                            }
+                            is Screen.Fortune -> FortuneScreen(viewModel = fortuneViewModel, analysisViewModel = analysisViewModel)
                             is Screen.QrScan -> QrScanScreen()
                             is Screen.History -> HistoryScreen(viewModel = historyViewModel)
                         }
