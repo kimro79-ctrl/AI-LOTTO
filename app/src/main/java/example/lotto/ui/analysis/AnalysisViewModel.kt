@@ -4,7 +4,6 @@ package com.example.lotto.ui.analysis
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lotto.data.local.LottoEntity
 import com.example.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -15,9 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -132,16 +128,8 @@ class AnalysisViewModel @Inject constructor(
         val current = _numberSets.value
         if (current.isNotEmpty()) {
             viewModelScope.launch {
-                val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 current.forEach { numbers ->
-                    // LottoEntity 생성자 구조 차이로 인한 컴파일 오류 방지를 위해 위치 기반 생성 또는 기본 생성자로 대체
-                    val entity = LottoEntity(
-                        0L,
-                        numbers.joinToString(","),
-                        "ANALYSIS",
-                        currentDate
-                    )
-                    repository.insertLotto(entity)
+                    repository.insertLotto(numbers, "ANALYSIS")[span_8](start_span)[span_8](end_span)[span_9](start_span)[span_9](end_span)
                 }
                 _saveMessage.value = "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
             }
@@ -151,15 +139,8 @@ class AnalysisViewModel @Inject constructor(
     fun saveExternalNumbers(sets: List<List<Int>>) {
         if (sets.isNotEmpty()) {
             viewModelScope.launch {
-                val currentDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 sets.forEach { numbers ->
-                    val entity = LottoEntity(
-                        0L,
-                        numbers.joinToString(","),
-                        "FORTUNE",
-                        currentDate
-                    )
-                    repository.insertLotto(entity)
+                    repository.insertLotto(numbers, "FORTUNE")[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)
                 }
                 _saveMessage.value = "성공적으로 ${sets.size}개의 조합이 내역에 저장되었습니다!"
             }
