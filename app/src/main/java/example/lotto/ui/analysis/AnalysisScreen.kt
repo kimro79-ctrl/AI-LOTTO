@@ -53,7 +53,7 @@ fun AnalysisScreen(
     val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
-    var selectedCountMode by remember { mutableStateOf(6) } // 기본 6개 또는 사용자 선택
+    var selectedSetCount by remember { mutableStateOf(5) } // 기본 5개 조합
 
     Column(
         modifier = Modifier
@@ -61,7 +61,7 @@ fun AnalysisScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. 최근 당첨 번호 배너 (실제 로또 색상 공 적용)
+        // 최근 당첨 번호 배너
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -70,7 +70,7 @@ fun AnalysisScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "최근 제 1100회 당첨 번호",
+                    text = "최근 제 1235회 당첨 번호",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -89,7 +89,6 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 타이틀 및 조건 설정 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,36 +122,36 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 2. 5개 설정 / 10개 설정 모드 선택 탭
+        // 5개 조합 / 10개 조합 선택 탭
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = { selectedCountMode = 5 },
+                onClick = { selectedSetCount = 5 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedCountMode == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = if (selectedSetCount == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "5개 추출 모드", fontWeight = FontWeight.Bold)
+                Text(text = "5개 조합", fontWeight = FontWeight.Bold)
             }
             Button(
-                onClick = { selectedCountMode = 10 },
+                onClick = { selectedSetCount = 10 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedCountMode == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                    containerColor = if (selectedSetCount == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(text = "10개 추출 모드", fontWeight = FontWeight.Bold)
+                Text(text = "10개 조합", fontWeight = FontWeight.Bold)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. 결과 리스트 영역 (LazyColumn으로 여러 세트 출력)
+        // 결과 리스트 영역 (LazyColumn)
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -169,7 +168,7 @@ fun AnalysisScreen(
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
-                                text = "추천 조합 ${index + 1} (${selectedCountMode}개 모드)",
+                                text = "추천 조합 ${index + 1}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.Gray
                             )
@@ -205,9 +204,8 @@ fun AnalysisScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 추출 버튼
         Button(
-            onClick = { viewModel.generateSmartNumbers(selectedCountMode) },
+            onClick = { viewModel.generateSmartNumbers(selectedSetCount) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
@@ -227,7 +225,6 @@ fun AnalysisScreen(
         }
     }
 
-    // 조건 설정 다이얼로그
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
@@ -272,11 +269,11 @@ fun AnalysisScreen(
 @Composable
 fun LottoBallItem(number: Int, size: Int) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFFBC02D) // 노란색
-        in 11..20 -> Color(0xFF1E88E5) // 파란색
-        in 21..30 -> Color(0xFFE53935) // 빨간색
-        in 31..40 -> Color(0xFF757575) // 회색
-        else -> Color(0xFF43A047) // 초록색
+        in 1..10 -> Color(0xFFFBC02D)
+        in 11..20 -> Color(0xFF1E88E5)
+        in 21..30 -> Color(0xFFE53935)
+        in 31..40 -> Color(0xFF757575)
+        else -> Color(0xFF43A047)
     }
 
     Box(
