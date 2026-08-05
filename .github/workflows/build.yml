@@ -21,16 +21,24 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Inject Gradle Properties
+        run: |
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.nonTransitiveRClass=true" >> gradle.properties
+          echo "android.suppressUnsupportedCompileSdk=36" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+
       - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
 
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: lotto-app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
