@@ -421,6 +421,7 @@ fun ConditionSelectDialog(
 ) {
     val conditions = listOf(
         "고도화 종합 분석 (7대 로직 적용)",
+        "완전 무작위 추첨 (일반 자동)",
         "최근 당첨 번호 이월 패턴 분석",
         "홀짝 / 고저 균형 필터링",
         "끝수 및 연속 번호 조합 제한"
