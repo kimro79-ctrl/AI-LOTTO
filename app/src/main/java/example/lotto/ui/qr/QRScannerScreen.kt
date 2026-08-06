@@ -127,7 +127,7 @@ fun QRScannerScreen(
                                             if (!isScanned && qrResultUrl.contains("dhlottery.co.kr")) {
                                                 isScanned = true
 
-                                                // QR URL에서 모든 게임(최대 5게임)의 번호 파싱 후 각각 DB 저장
+                                                // 모든 게임 번호를 한 번에 파싱하여 각각 저장
                                                 parseAllLottoGamesFromUrl(qrResultUrl).forEach { (round, numbers) ->
                                                     purchaseViewModel.addPurchaseItem(round, numbers)
                                                 }
@@ -192,7 +192,7 @@ fun QRScannerScreen(
 }
 
 /**
- * 동행복권 QR 코드 URL에서 여러 게임(A~E)의 번호를 모두 파싱
+ * 동행복권 QR 코드 URL에서 회차 정보와 모든 게임(최대 5게임)의 번호들을 완벽하게 추출
  */
 private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
     val results = mutableListOf<Pair<Int, List<Int>>>()
@@ -200,51 +200,61 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
         val uri = Uri.parse(url)
         val vParam = uri.getQueryParameter("v") ?: return results
         
-        // 동행복권 QR 코드는 게임별로 'q' 또는 기타 구분자로 나누어져 있거나 연속될 수 있음
-        // 일반적인 형식: 회차번호 + m + 게임별 번호들 (구분자 q로 여러 게임 분리)
-        val gameTokens = vParam.split("q")
-        
-        for (token in gameTokens) {
+        // 동행복권 URL 파라미터는 여러 게임이 포함될 때 특정 구분자(q 등)로 나뉘거나
+        // 숫자가 연속될 수 있으므로 구분자를 기준으로 먼저 토큰화
+        val tokens = vParam.split("q", "and", ",")
+
+        for (token in tokens) {
             val parts = token.split("m")
             if (parts.size >= 2) {
                 val round = parts[0].toIntOrNull() ?: continue
                 val numbersStr = parts[1]
-                val numbers = mutableListOf<Int>()
                 
+                // 2자리씩 숫자를 파싱하여 리스트에 담기
+                val allNumbers = mutableListOf<Int>()
                 var i = 0
                 while (i < numbersStr.length - 1) {
                     val numStr = numbersStr.substring(i, i + 2)
-                    numStr.toIntOrNull()?.let { numbers.add(it) }
+                    numStr.toIntOrNull()?.let { allNumbers.add(it) }
                     i += 2
                 }
 
-                if (numbers.size >= 6) {
-                    results.add(Pair(round, numbers.take(6)))
-                }
-            } else {
-                // 만약 m 페어가 하나만 있는 경우 전체 문자열 처리
-                val partsMain = vParam.split("m")
-                if (partsMain.size >= 2) {
-                    val round = partsMain[0].toIntOrNull() ?: continue
-                    val numbersStr = partsMain[1]
-                    val numbers = mutableListOf<Int>()
-                    var i = 0
-                    while (i < numbersStr.length - 1) {
-                        val numStr = numbersStr.substring(i, i + 2)
-                        numStr.toIntOrNull()?.let { numbers.add(it) }
-                        i += 2
-                    }
-                    if (numbers.size >= 6) {
-                        results.add(Pair(round, numbers.take(6)))
+                // 한 게임당 보통 6개 번호씩 끊어서 여러 게임 생성
+                if (allNumbers.size >= 6) {
+                    for (chunk in allNumbers.chunked(6)) {
+                        if (chunk.size == 6) {
+                            results.add(Pair(round, chunk))
+                        }
                     }
                 }
-                break
+            }
+        }
+
+        // 만약 위 구분자 방식으로 잡히지 않는 통합 형태일 경우 전체 문자열에서 회차와 번호 추출 보완
+        if (results.isEmpty()) {
+            val mainParts = vParam.split("m")
+            if (mainParts.size >= 2) {
+                val round = mainParts[0].toIntOrNull() ?: return results
+                val numbersStr = mainParts[1]
+                val allNumbers = mutableListOf<Int>()
+                var i = 0
+                while (i < numbersStr.length - 1) {
+                    val numStr = numbersStr.substring(i, i + 2)
+                    numStr.toIntOrNull()?.let { allNumbers.add(it) }
+                    i += 2
+                }
+                for (chunk in allNumbers.chunked(6)) {
+                    if (chunk.size == 6) {
+                        results.add(Pair(round, chunk))
+                    }
+                }
             }
         }
     } catch (e: Exception) {
         e.printStackTrace()
     }
-    // 중복 추가 방지 및 결과 반환
+    
+    // 중복된 게임 제거 후 반환
     return results.distinct()
 }
 
