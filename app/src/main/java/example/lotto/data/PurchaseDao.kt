@@ -1,28 +1,33 @@
-package com.kimro.ai.lotto.data
+package com.kimro.ai.lotto.data.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.kimro.ai.lotto.data.entity.PurchaseEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PurchaseDao {
+
+    // 최신 등록된 항목이 맨 위로 오도록 내림차순 정렬 조회
     @Query("SELECT * FROM purchase_table ORDER BY id DESC")
     fun getAllPurchases(): Flow<List<PurchaseEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // 중복 데이터(회차+번호 조합)가 이미 존재하면 무시하고 삽입
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertPurchase(purchase: PurchaseEntity)
 
-    @Query("UPDATE purchase_table SET rankResult = :result WHERE id = :id")
-    suspend fun updateRankResult(id: Long, result: String)
-
-    // 항목 단건 삭제 기능 추가
+    // 특정 항목 삭제
     @Delete
     suspend fun deletePurchase(purchase: PurchaseEntity)
 
-    // 전체 내역 삭제 기능 추가 (필요시 사용)
+    // ID로 특정 항목 삭제
+    @Query("DELETE FROM purchase_table WHERE id = :id")
+    suspend fun deletePurchaseById(id: Long)
+
+    // 전체 내역 초기화
     @Query("DELETE FROM purchase_table")
     suspend fun deleteAllPurchases()
 }
