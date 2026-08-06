@@ -1,7 +1,7 @@
-package com.example.lotto.data.repository
+package com.kimro.ai.lotto.data.repository
 
-import com.example.lotto.data.local.LottoDao
-import com.example.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.data.local.LottoDao
+import com.kimro.ai.lotto.data.local.LottoEntity
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,4 +33,3 @@ class LottoRepositoryImpl @Inject constructor(
         lottoDao.deleteById(id)
     }
 }
-
