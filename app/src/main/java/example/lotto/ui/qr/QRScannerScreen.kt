@@ -56,8 +56,7 @@ fun QRScannerScreen(
 
     var scanCount by remember { mutableStateOf(0) }
     var lastScannedUrl by remember { mutableStateOf<String?>(null) }
-    
-    // 연속 스캔 시 너무 빠른 중복 저장을 막기 위한 짧은 쿨다운 플래그
+    var lastProcessedUrl by remember { mutableStateOf<String?>(null) } // 중복 방지 전용 변수 분리
     var isCoolingDown by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -141,24 +140,43 @@ fun QRScannerScreen(
 
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
-                                            // 동행복권 URL이 맞고 쿨다운 상태가 아닐 때 인식 허용
-                                            if (qrResultUrl.contains("dhlottery.co.kr") && !isCoolingDown) {
-                                                isCoolingDown = true
-                                                lastScannedUrl = qrResultUrl
 
-                                                val games = parseAllLottoGamesFromUrl(qrResultUrl)
-                                                if (games.isNotEmpty()) {
-                                                    for ((round, numbers) in games) {
-                                                        purchaseViewModel.addPurchaseItem(round, numbers)
-                                                    }
-                                                    scanCount += games.size
-                                                }
-
-                                                // 1.5초 후 다음 QR 코드를 인식할 수 있도록 쿨다운 해제
-                                                android.os.Handler(ctx.mainLooper).postDelayed({
-                                                    isCoolingDown = false
-                                                }, 1500)
+                                            // 동행복권 QR만 허용
+                                            if (!qrResultUrl.contains("dhlottery.co.kr")) {
+                                                return@processImageProxy
                                             }
+
+                                            // 이미 처리 중이면 무시
+                                            if (isCoolingDown) {
+                                                return@processImageProxy
+                                            }
+
+                                            // 동일 QR 연속 재인식이면 무시
+                                            if (lastProcessedUrl == qrResultUrl) {
+                                                return@processImageProxy
+                                            }
+
+                                            isCoolingDown = true
+                                            lastScannedUrl = qrResultUrl      // 버튼 유지용
+                                            lastProcessedUrl = qrResultUrl    // 중복 방지용
+
+                                            val games = parseAllLottoGamesFromUrl(qrResultUrl)
+
+                                            if (games.isNotEmpty()) {
+                                                games.forEach { (round, numbers) ->
+                                                    purchaseViewModel.addPurchaseItem(
+                                                        round = round,
+                                                        numbers = numbers
+                                                    )
+                                                }
+                                                scanCount += games.size
+                                            }
+
+                                            // 2초 후 쿨다운 및 중복 방지 키만 해제 (버튼은 계속 유지됨)
+                                            android.os.Handler(ctx.mainLooper).postDelayed({
+                                                isCoolingDown = false
+                                                lastProcessedUrl = null
+                                            }, 2000)
                                         }
                                     }
 
@@ -206,7 +224,7 @@ fun QRScannerScreen(
                 }
 
                 Text(
-                    text = "다른 용지의 QR 코드를 갖다 대면\n이어서 계속 추가 저장됩니다.",
+                    text = "QR 코드를 갖다 대면 용지에 있는\n모든 게임 번호들이 각각 올바르게 저장됩니다.",
                     fontSize = 13.sp,
                     color = Color(0xFF64748B),
                     textAlign = TextAlign.Center
@@ -224,7 +242,7 @@ fun QRScannerScreen(
                     ) {
                         Text(
                             text = "동행복권에서 공식 당첨 결과 보기",
-                            color = Color.White,
+                            color = Color(0xFFFFFFFF),
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         )
@@ -290,7 +308,9 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
         e.printStackTrace()
     }
     
-    return results.distinct()
+    return results
+        .map { it.first to it.second.sorted() }
+        .distinct()
 }
 
 private fun processImageProxy(
@@ -299,8 +319,9 @@ private fun processImageProxy(
     onQrDetected: (String) -> Unit
 ) {
     val mediaImage = imageProxy.image
+    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
     if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val image = InputImage.fromMediaImage(mediaImage, rotationDegrees)
         scanner.process(image)
             .addOnSuccessListener { barcodes ->
                 for (barcode in barcodes) {
