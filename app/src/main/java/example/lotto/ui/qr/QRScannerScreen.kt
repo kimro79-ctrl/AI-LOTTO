@@ -54,6 +54,13 @@ fun QRScannerScreen(
         )
     }
 
+    // 연속 스캔 개수 카운트 및 마지막 URL 기억용
+    var scanCount by remember { mutableStateOf(0) }
+    var lastScannedUrl by remember { mutableStateOf<String?>(null) }
+    
+    // 최근 스캔 성공 시 잠시 멈춤을 위한 딜레이 플래그 (중복 인식 방지용 쿨다운)
+    var isCoolingDown by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -71,7 +78,7 @@ fun QRScannerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "QR 당첨 확인",
+                        text = "QR 연속 당첨 확인",
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1E293B)
                     )
@@ -94,9 +101,23 @@ fun QRScannerScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(24.dp)
             ) {
+                // 스캔된 개수 표시 배지
+                Surface(
+                    color = Color(0xFFE0F2FE),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        text = "현재까지 총 ${scanCount}개 게임 저장됨",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0284C7)
+                    )
+                }
+
                 Box(
                     modifier = Modifier
-                        .size(260.dp)
+                        .size(240.dp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(Color(0xFFE2E8F0))
                         .border(2.dp, Color(0xFF0EA5E9), RoundedCornerShape(24.dp)),
@@ -119,21 +140,26 @@ fun QRScannerScreen(
                                     val imageAnalysis = ImageAnalysis.Builder()
                                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                         .build()
-                                        
-                                    var isScanned = false
 
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
-                                            if (!isScanned && qrResultUrl.contains("dhlottery.co.kr")) {
-                                                isScanned = true
+                                            if (qrResultUrl.contains("dhlottery.co.kr") && !isCoolingDown) {
+                                                isCoolingDown = true
+                                                lastScannedUrl = qrResultUrl
 
-                                                // 모든 게임 번호를 한 번에 파싱하여 각각 저장
-                                                parseAllLottoGamesFromUrl(qrResultUrl).forEach { (round, numbers) ->
-                                                    purchaseViewModel.addPurchaseItem(round, numbers)
+                                                // URL에서 모든 게임 번호 추출하여 DB에 누적 저장
+                                                val games = parseAllLottoGamesFromUrl(qrResultUrl)
+                                                if (games.isNotEmpty()) {
+                                                    for ((round, numbers) in games) {
+                                                        purchaseViewModel.addPurchaseItem(round, numbers)
+                                                    }
+                                                    scanCount += games.size
                                                 }
 
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(qrResultUrl))
-                                                ctx.startActivity(intent)
+                                                // 1.5초 동안은 연속 중복 인식을 막기 위한 쿨다운 (연속 스캔 편의성)
+                                                android.os.Handler(ctx.mainLooper).postDelayed({
+                                                    isCoolingDown = false
+                                                }, 1500)
                                             }
                                         }
                                     }
@@ -182,17 +208,38 @@ fun QRScannerScreen(
                 }
 
                 Text(
-                    text = "자동으로 당첨 결과가 스캔됩니다",
+                    text = "용지의 QR코드들을 계속 갖다 대세요.\n자동으로 차례차례 누적 저장됩니다.",
                     fontSize = 13.sp,
-                    color = Color(0xFF94A3B8)
+                    color = Color(0xFF64748B),
+                    textAlign = TextAlign.Center
                 )
+
+                // 동행복권 공식 결과 웹페이지로 이동 버튼 (원할 때 언제든 확인 가능)
+                if (lastScannedUrl != null) {
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(lastScannedUrl))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "동행복권에서 공식 당첨 결과 보기",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * 동행복권 QR 코드 URL에서 회차 정보와 모든 게임(최대 5게임)의 번호들을 완벽하게 추출
+ * 동행복권 QR 코드 URL에서 회차 정보와 번호 파싱
  */
 private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
     val results = mutableListOf<Pair<Int, List<Int>>>()
@@ -200,8 +247,6 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
         val uri = Uri.parse(url)
         val vParam = uri.getQueryParameter("v") ?: return results
         
-        // 동행복권 URL 파라미터는 여러 게임이 포함될 때 특정 구분자(q 등)로 나뉘거나
-        // 숫자가 연속될 수 있으므로 구분자를 기준으로 먼저 토큰화
         val tokens = vParam.split("q", "and", ",")
 
         for (token in tokens) {
@@ -210,7 +255,6 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
                 val round = parts[0].toIntOrNull() ?: continue
                 val numbersStr = parts[1]
                 
-                // 2자리씩 숫자를 파싱하여 리스트에 담기
                 val allNumbers = mutableListOf<Int>()
                 var i = 0
                 while (i < numbersStr.length - 1) {
@@ -219,7 +263,6 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
                     i += 2
                 }
 
-                // 한 게임당 보통 6개 번호씩 끊어서 여러 게임 생성
                 if (allNumbers.size >= 6) {
                     for (chunk in allNumbers.chunked(6)) {
                         if (chunk.size == 6) {
@@ -230,7 +273,6 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
             }
         }
 
-        // 만약 위 구분자 방식으로 잡히지 않는 통합 형태일 경우 전체 문자열에서 회차와 번호 추출 보완
         if (results.isEmpty()) {
             val mainParts = vParam.split("m")
             if (mainParts.size >= 2) {
@@ -254,7 +296,6 @@ private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
         e.printStackTrace()
     }
     
-    // 중복된 게임 제거 후 반환
     return results.distinct()
 }
 
