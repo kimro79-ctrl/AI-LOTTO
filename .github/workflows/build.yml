@@ -20,8 +20,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.7
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Generate Gradle Wrapper 8.7
+        run: gradle wrapper --gradle-version 8.7 --distribution-type bin
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -32,11 +37,6 @@ jobs:
           echo "android.nonTransitiveRClass=true" >> gradle.properties
           echo "android.suppressUnsupportedCompileSdk=36" >> gradle.properties
           echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
-
-      - name: Setup Gradle 8.7
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
 
       - name: Build Release App Bundle (Signed)
         run: ./gradlew bundleRelease
