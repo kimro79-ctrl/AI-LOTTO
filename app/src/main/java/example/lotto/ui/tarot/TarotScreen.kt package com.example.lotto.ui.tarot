@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/tarot/TarotScreen.kt
-package com.example.lotto.ui.tarot
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/tarot/TarotScreen.kt
+package com.kimro.ai.lotto.ui.tarot
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -81,7 +81,7 @@ fun TarotScreen(
             Button(
                 onClick = { selectedSetCount = 5 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedSetCount == 5) Color(0xFFD0BFFF) else Color(0xFFF0EDFF) // 파스텔 연보라 / 연한 회보라
+                    containerColor = if (selectedSetCount == 5) Color(0xFFD0BFFF) else Color(0xFFF0EDFF)
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
@@ -95,7 +95,7 @@ fun TarotScreen(
             Button(
                 onClick = { selectedSetCount = 10 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedSetCount == 10) Color(0xFFFFC6FF) else Color(0xFFFFF0F5) // 파스텔 연분홍 / 연한 핑크
+                    containerColor = if (selectedSetCount == 10) Color(0xFFFFC6FF) else Color(0xFFFFF0F5)
                 ),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
@@ -115,7 +115,7 @@ fun TarotScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA0C4FF)), // 파스텔 블루톤 메인 버튼
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA0C4FF)),
             shape = RoundedCornerShape(12.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
@@ -130,7 +130,7 @@ fun TarotScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCAFFBF)), // 파스텔 그린톤 저장 버튼
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCAFFBF)),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF222222))
@@ -148,7 +148,7 @@ fun TarotScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDFFB6)), // 파스텔 노랑톤 타로 카드 결과 박스
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDFFB6)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
@@ -168,7 +168,7 @@ fun TarotScreen(
                 itemsIndexed(generatedTarotSets) { index, numbers ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE4C1F9)), // 파스텔 라벤더톤 조합 결과 카드
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE4C1F9)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -214,11 +214,11 @@ fun TarotScreen(
 @Composable
 fun TarotBallItem(number: Int, size: Int) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFFFD166) // 파스텔 골드/옐로
-        in 11..20 -> Color(0xFF9BF6FF) // 파스텔 블루
-        in 21..30 -> Color(0xFFFFADAD) // 파스텔 레드/핑크
-        in 31..40 -> Color(0xFFBDB2FF) // 파스텔 퍼플
-        else -> Color(0xFFCAFFBF) // 파스텔 그린
+        in 1..10 -> Color(0xFFFFD166)
+        in 11..20 -> Color(0xFF9BF6FF)
+        in 21..30 -> Color(0xFFFFADAD)
+        in 31..40 -> Color(0xFFBDB2FF)
+        else -> Color(0xFFCAFFBF)
     }
 
     Box(
