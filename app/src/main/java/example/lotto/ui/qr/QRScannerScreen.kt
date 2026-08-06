@@ -3,9 +3,12 @@ package com.example.lotto.ui.qr
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -27,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,16 +100,33 @@ fun QrScanScreen() {
                     contentAlignment = Alignment.Center
                 ) {
                     if (hasCameraPermission) {
-                        // 실제 카메라 화면을 띄우는 뷰
+                        // 실제 카메라 화면 및 QR 분석기를 띄우는 뷰
                         AndroidView(
                             factory = { ctx ->
                                 val previewView = PreviewView(ctx)
                                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                                val executor = Executors.newSingleThreadExecutor()
+
                                 cameraProviderFuture.addListener({
                                     val cameraProvider = cameraProviderFuture.get()
                                     val preview = Preview.Builder().build().also {
                                         it.setSurfaceProvider(previewView.surfaceProvider)
                                     }
+                                    
+                                    // QR 코드 분석기 설정 (Google ML Kit 활용)
+                                    val scanner = BarcodeScanning.getClient()
+                                    val imageAnalysis = ImageAnalysis.Builder()
+                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                        .build()
+                                        
+                                    imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                        processImageProxy(scanner, imageProxy) { qrResultUrl ->
+                                            // QR 코드가 인식되었을 때 실행될 로직 (동행복권 URL 결과 처리)
+                                            Toast.makeText(ctx, "인식된 결과: $qrResultUrl", Toast.LENGTH_LONG).show()
+                                            // 필요시 웹뷰 이동 또는 결과 처리 로직 추가
+                                        }
+                                    }
+
                                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                                     try {
@@ -110,7 +134,8 @@ fun QrScanScreen() {
                                         cameraProvider.bindToLifecycle(
                                             lifecycleOwner,
                                             cameraSelector,
-                                            preview
+                                            preview,
+                                            imageAnalysis // 분석기 바인딩 추가
                                         )
                                     } catch (e: Exception) {
                                         e.printStackTrace()
@@ -152,5 +177,38 @@ fun QrScanScreen() {
                 )
             }
         }
+    }
+}
+
+// 실시간 카메라 이미지에서 QR 코드를 추출하는 유틸 함수
+private fun processImageProxy(
+    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    imageProxy: ImageProxy,
+    onQrDetected: (String) -> Unit
+) {
+    val mediaImage = imageProxy.image
+    if (mediaImage != null) {
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        scanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                for (barcode in barcodes) {
+                    when (barcode.valueType) {
+                        Barcode.TYPE_URL, Barcode.TYPE_TEXT -> {
+                            val rawValue = barcode.rawValue
+                            if (rawValue != null) {
+                                onQrDetected(rawValue)
+                            }
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener {
+                // 실패 시 예외 처리
+            }
+            .addOnCompleteLiistener {
+                imageProxy.close()
+            }
+    } else {
+        imageProxy.close()
     }
 }
