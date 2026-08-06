@@ -1,4 +1,4 @@
-package com.example.lotto
+package com.kimro.ai.lotto
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
