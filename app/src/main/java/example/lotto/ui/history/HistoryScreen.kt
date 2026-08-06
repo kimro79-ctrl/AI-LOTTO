@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/history/HistoryScreen.kt
-package com.example.lotto.ui.history
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/history/HistoryScreen.kt
+package com.kimro.ai.lotto.ui.history
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.data.local.LottoEntity
 
 @Composable
 fun HistoryScreen(
@@ -70,7 +70,7 @@ fun HistoryScreen(
                 fontSize = 22.sp
             )
 
-            // 전체 삭제 버튼 (내역이 있을 때만 표시)[span_3](start_span)[span_3](end_span)
+            // 전체 삭제 버튼 (내역이 있을 때만 표시)
             if (historyList.isNotEmpty()) {
                 IconButton(
                     onClick = { showClearAllDialog = true },
