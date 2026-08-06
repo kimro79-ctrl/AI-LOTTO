@@ -127,7 +127,8 @@ fun QRScannerScreen(
                                             if (!isScanned && qrResultUrl.contains("dhlottery.co.kr")) {
                                                 isScanned = true
 
-                                                parseLottoQrUrl(qrResultUrl)?.let { (round, numbers) ->
+                                                // QR URL에서 모든 게임(최대 5게임)의 번호 파싱 후 각각 DB 저장
+                                                parseAllLottoGamesFromUrl(qrResultUrl).forEach { (round, numbers) ->
                                                     purchaseViewModel.addPurchaseItem(round, numbers)
                                                 }
 
@@ -190,31 +191,61 @@ fun QRScannerScreen(
     }
 }
 
-private fun parseLottoQrUrl(url: String): Pair<Int, List<Int>>? {
+/**
+ * 동행복권 QR 코드 URL에서 여러 게임(A~E)의 번호를 모두 파싱
+ */
+private fun parseAllLottoGamesFromUrl(url: String): List<Pair<Int, List<Int>>> {
+    val results = mutableListOf<Pair<Int, List<Int>>>()
     try {
         val uri = Uri.parse(url)
-        val vParam = uri.getQueryParameter("v") ?: return null
-        val parts = vParam.split("m")
-        if (parts.size >= 2) {
-            val round = parts[0].toIntOrNull() ?: return null
-            val numbersStr = parts[1]
-            val numbers = mutableListOf<Int>()
-            
-            var i = 0
-            while (i < numbersStr.length - 1) {
-                val numStr = numbersStr.substring(i, i + 2)
-                numStr.toIntOrNull()?.let { numbers.add(it) }
-                i += 2
-            }
+        val vParam = uri.getQueryParameter("v") ?: return results
+        
+        // 동행복권 QR 코드는 게임별로 'q' 또는 기타 구분자로 나누어져 있거나 연속될 수 있음
+        // 일반적인 형식: 회차번호 + m + 게임별 번호들 (구분자 q로 여러 게임 분리)
+        val gameTokens = vParam.split("q")
+        
+        for (token in gameTokens) {
+            val parts = token.split("m")
+            if (parts.size >= 2) {
+                val round = parts[0].toIntOrNull() ?: continue
+                val numbersStr = parts[1]
+                val numbers = mutableListOf<Int>()
+                
+                var i = 0
+                while (i < numbersStr.length - 1) {
+                    val numStr = numbersStr.substring(i, i + 2)
+                    numStr.toIntOrNull()?.let { numbers.add(it) }
+                    i += 2
+                }
 
-            if (numbers.isNotEmpty()) {
-                return Pair(round, numbers)
+                if (numbers.size >= 6) {
+                    results.add(Pair(round, numbers.take(6)))
+                }
+            } else {
+                // 만약 m 페어가 하나만 있는 경우 전체 문자열 처리
+                val partsMain = vParam.split("m")
+                if (partsMain.size >= 2) {
+                    val round = partsMain[0].toIntOrNull() ?: continue
+                    val numbersStr = partsMain[1]
+                    val numbers = mutableListOf<Int>()
+                    var i = 0
+                    while (i < numbersStr.length - 1) {
+                        val numStr = numbersStr.substring(i, i + 2)
+                        numStr.toIntOrNull()?.let { numbers.add(it) }
+                        i += 2
+                    }
+                    if (numbers.size >= 6) {
+                        results.add(Pair(round, numbers.take(6)))
+                    }
+                }
+                break
             }
         }
     } catch (e: Exception) {
         e.printStackTrace()
     }
-    return null
+    // 중복 추가 방지 및 결과 반환
+    return results.distinct()
 }
 
 private fun processImageProxy(
