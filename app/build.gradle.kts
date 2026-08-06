@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.lotto"
+    namespace = "com.kimro.ai.lotto"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.lotto"
+        applicationId = "com.kimro.ai.lotto"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -84,4 +84,3 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 }
-
