@@ -1,3 +1,4 @@
+// app/src/main/java/com/kimro/ai/lotto/ui/purchase/PurchaseViewModel.kt
 package com.kimro.ai.lotto.ui.purchase
 
 import androidx.lifecycle.ViewModel
