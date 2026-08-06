@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/MainActivity.kt
-package com.example.lotto
+// File Path: app/src/main/java/com/kimro/ai/lotto/MainActivity.kt
+package com.kimro.ai.lotto
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,12 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.example.lotto.ui.analysis.AnalysisScreen
-import com.example.lotto.ui.analysis.AnalysisViewModel
-import com.example.lotto.ui.fortune.FortuneScreen
-import com.example.lotto.ui.history.HistoryScreen
-import com.example.lotto.ui.history.HistoryViewModel
-import com.example.lotto.ui.qr.QrScanScreen
+import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
+import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
+import com.kimro.ai.lotto.ui.fortune.FortuneScreen
+import com.kimro.ai.lotto.ui.history.HistoryScreen
+import com.kimro.ai.lotto.ui.history.HistoryViewModel
+import com.kimro.ai.lotto.ui.qr.QrScanScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (currentScreen) {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
-                            is Screen.Fortune -> FortuneScreen() // 매개변수 없이 호출
+                            is Screen.Fortune -> FortuneScreen()
                             is Screen.QrScan -> QrScanScreen()
                             is Screen.History -> HistoryScreen(viewModel = historyViewModel)
                         }
