@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/saved/SavedNumbersViewModel.kt
-package com.example.lotto.ui.saved
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/saved/SavedNumbersViewModel.kt
+package com.kimro.ai.lotto.ui.saved
 
 import android.app.Application
 import android.content.Context
@@ -38,4 +38,3 @@ class SavedNumbersViewModel @Inject constructor(
         _savedSets.value = emptyList()
     }
 }
-
