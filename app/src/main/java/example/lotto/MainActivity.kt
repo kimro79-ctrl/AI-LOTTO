@@ -21,7 +21,7 @@ import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
 import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
 import com.kimro.ai.lotto.ui.fortune.FortuneScreen
 import com.kimro.ai.lotto.ui.purchase.PurchaseScreen
-import com.kimro.ai.lotto.ui.qr.QrScanScreen
+import com.kimro.ai.lotto.ui.qr.QRScannerScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
                         when (currentScreen) {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
                             is Screen.Fortune -> FortuneScreen()
-                            is Screen.QrScan -> QrScanScreen()
+                            is Screen.QrScan -> QRScannerScreen()
                             is Screen.Purchase -> PurchaseScreen()
                         }
                     }
