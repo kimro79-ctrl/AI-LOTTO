@@ -1,9 +1,9 @@
-// File Path: app/src/main/java/com/example/lotto/ui/fortune/FortuneViewModel.kt
-package com.example.lotto.ui.fortune
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/fortune/FortuneViewModel.kt
+package com.kimro.ai.lotto.ui.fortune
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lotto.data.repository.LottoRepository
+import com.kimro.ai.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
