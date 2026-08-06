@@ -57,8 +57,8 @@ fun QRScannerScreen(
     var scanCount by remember { mutableStateOf(0) }
     var lastScannedUrl by remember { mutableStateOf<String?>(null) }
     
-    // 이미 스캔한 URL을 기억하여 절대 중복으로 다시 저장되지 않게 함
-    var scannedUrlHistory by remember { mutableStateOf(setOf<String>()) }
+    // 연속 스캔 시 너무 빠른 중복 저장을 막기 위한 짧은 쿨다운 플래그
+    var isCoolingDown by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -141,9 +141,9 @@ fun QRScannerScreen(
 
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
-                                            // 아직 스캔하지 않은 새로운 동행복권 URL일 경우에만 단 한 번 처리
-                                            if (qrResultUrl.contains("dhlottery.co.kr") && !scannedUrlHistory.contains(qrResultUrl)) {
-                                                scannedUrlHistory = scannedUrlHistory + qrResultUrl
+                                            // 동행복권 URL이 맞고 쿨다운 상태가 아닐 때 인식 허용
+                                            if (qrResultUrl.contains("dhlottery.co.kr") && !isCoolingDown) {
+                                                isCoolingDown = true
                                                 lastScannedUrl = qrResultUrl
 
                                                 val games = parseAllLottoGamesFromUrl(qrResultUrl)
@@ -153,6 +153,11 @@ fun QRScannerScreen(
                                                     }
                                                     scanCount += games.size
                                                 }
+
+                                                // 1.5초 후 다음 QR 코드를 인식할 수 있도록 쿨다운 해제
+                                                android.os.Handler(ctx.mainLooper).postDelayed({
+                                                    isCoolingDown = false
+                                                }, 1500)
                                             }
                                         }
                                     }
@@ -201,7 +206,7 @@ fun QRScannerScreen(
                 }
 
                 Text(
-                    text = "QR 코드를 갖다 대면 포함된 게임들이\n자동으로 내역에 안전하게 저장됩니다.",
+                    text = "다른 용지의 QR 코드를 갖다 대면\n이어서 계속 추가 저장됩니다.",
                     fontSize = 13.sp,
                     color = Color(0xFF64748B),
                     textAlign = TextAlign.Center
