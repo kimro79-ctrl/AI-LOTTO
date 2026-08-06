@@ -20,8 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
 import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
 import com.kimro.ai.lotto.ui.fortune.FortuneScreen
-import com.kimro.ai.lotto.ui.history.HistoryScreen
-import com.kimro.ai.lotto.ui.history.HistoryViewModel
+import com.kimro.ai.lotto.ui.purchase.PurchaseScreen
 import com.kimro.ai.lotto.ui.qr.QrScanScreen
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -29,14 +28,13 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object Analysis : Screen("analysis", "분석", Icons.Default.Settings)
     object Fortune : Screen("fortune", "운세", Icons.Default.DateRange)
     object QrScan : Screen("qr_scan", "QR스캔", Icons.Default.Search)
-    object History : Screen("history", "내역", Icons.Default.List)
+    object Purchase : Screen("purchase", "내역", Icons.Default.List)
 }
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val analysisViewModel: AnalysisViewModel by viewModels()
-    private val historyViewModel: HistoryViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +56,7 @@ class MainActivity : ComponentActivity() {
                                 Screen.Analysis,
                                 Screen.Fortune,
                                 Screen.QrScan,
-                                Screen.History
+                                Screen.Purchase
                             )
 
                             items.forEach { screen ->
@@ -89,7 +87,7 @@ class MainActivity : ComponentActivity() {
                             is Screen.Analysis -> AnalysisScreen(viewModel = analysisViewModel)
                             is Screen.Fortune -> FortuneScreen()
                             is Screen.QrScan -> QrScanScreen()
-                            is Screen.History -> HistoryScreen(viewModel = historyViewModel)
+                            is Screen.Purchase -> PurchaseScreen()
                         }
                     }
                 }
