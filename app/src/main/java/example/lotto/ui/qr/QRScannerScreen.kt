@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/example/lotto/ui/qr/QrScanScreen.kt
-package com.example.lotto.ui.qr
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/qr/QrScanScreen.kt
+package com.kimro.ai.lotto.ui.qr
 
 import android.Manifest
 import android.content.Intent
