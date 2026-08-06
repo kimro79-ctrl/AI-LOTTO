@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/fortune/FortuneScreen.kt
-package com.example.lotto.ui.fortune
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/fortune/FortuneScreen.kt
+package com.kimro.ai.lotto.ui.fortune
 
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -225,7 +225,7 @@ fun CardBackItem(cardIndex: Int, onClick: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "TAROT",
-                color = Color(0xFFFFD700), // 수정됨: 올바른 골드 컬러 코드 적용
+                color = Color(0xFFFFD700),
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
