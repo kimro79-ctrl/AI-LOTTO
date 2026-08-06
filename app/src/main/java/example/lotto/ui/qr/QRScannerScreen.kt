@@ -2,7 +2,9 @@
 package com.example.lotto.ui.qr
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -116,9 +118,17 @@ fun QrScanScreen() {
                                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                         .build()
                                         
+                                    // 중복 실행 방지용 플래그
+                                    var isScanned = false
+
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
-                                            Toast.makeText(ctx, "인식된 결과: $qrResultUrl", Toast.LENGTH_LONG).show()
+                                            if (!isScanned && qrResultUrl.contains("dhlottery.co.kr")) {
+                                                isScanned = true
+                                                // 브라우저로 동행복권 당첨 결과 페이지 열기
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(qrResultUrl))
+                                                ctx.startActivity(intent)
+                                            }
                                         }
                                     }
 
