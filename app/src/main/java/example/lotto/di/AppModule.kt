@@ -1,11 +1,11 @@
-package com.example.lotto.di
+package com.kimro.ai.lotto.di
 
 import android.content.Context
 import androidx.room.Room
-import com.example.lotto.data.local.LottoDao
-import com.example.lotto.data.local.LottoDatabase
-import com.example.lotto.data.repository.LottoRepository
-import com.example.lotto.data.repository.LottoRepositoryImpl
+import com.kimro.ai.lotto.data.local.LottoDao
+import com.kimro.ai.lotto.data.local.LottoDatabase
+import com.kimro.ai.lotto.data.repository.LottoRepository
+import com.kimro.ai.lotto.data.repository.LottoRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,4 +41,3 @@ object AppModule {
         return LottoRepositoryImpl(lottoDao)
     }
 }
-
