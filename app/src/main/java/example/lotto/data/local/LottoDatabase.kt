@@ -1,4 +1,4 @@
-package com.example.lotto.data.local
+package com.kimro.ai.lotto.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
