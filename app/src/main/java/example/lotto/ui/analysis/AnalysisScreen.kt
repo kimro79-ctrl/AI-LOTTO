@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/main/AnalysisScreen.kt
-package com.example.lotto.ui.main
+// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisScreen.kt
+package com.example.lotto.ui.analysis
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,10 +13,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.lotto.ui.main.AnalysisViewModel // 필요시 ViewModel 임포트
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalysisScreen() {
+fun AnalysisScreen(
+    viewModel: AnalysisViewModel? = null // ViewModel 매개변수 추가로 에러 방지
+) {
     var showConditionDialog by remember { mutableStateOf(false) }
     var showLogicInfoDialog by remember { mutableStateOf(false) }
     var selectedCondition by remember { mutableStateOf("고도화 종합 분석 (7대 로직 적용)") }
