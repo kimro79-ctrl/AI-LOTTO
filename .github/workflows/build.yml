@@ -1,5 +1,4 @@
-# .github/workflows/android-build.yml
-Name: Android Release Build Pipeline
+name: Android Release Build Pipeline
 
 on:
   push:
