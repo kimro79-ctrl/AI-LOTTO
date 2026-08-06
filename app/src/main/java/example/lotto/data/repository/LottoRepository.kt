@@ -1,6 +1,6 @@
-package com.example.lotto.data.repository
+package com.kimro.ai.lotto.data.repository
 
-import com.example.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.data.local.LottoEntity
 import kotlinx.coroutines.flow.Flow
 
 interface LottoRepository {
