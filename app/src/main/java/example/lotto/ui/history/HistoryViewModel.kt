@@ -1,10 +1,10 @@
-// File Path: app/src/main/java/com/example/lotto/ui/history/HistoryViewModel.kt
-package com.example.lotto.ui.history
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/history/HistoryViewModel.kt
+package com.kimro.ai.lotto.ui.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lotto.data.local.LottoEntity
-import com.example.lotto.data.repository.LottoRepository
+import com.kimro.ai.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
