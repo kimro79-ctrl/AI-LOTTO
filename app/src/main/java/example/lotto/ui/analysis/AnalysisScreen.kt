@@ -1,50 +1,26 @@
-// File Path: app/src/main/java/example/lotto/ui/analysis/AnalysisScreen.kt
-package com.example.lotto.ui.analysis
+// File Path: app/src/main/java/example/lotto/ui/main/MainScreen.kt
+package example.lotto.ui.main
 
-import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalysisScreen(
-    viewModel: AnalysisViewModel
-) {
-    val context = LocalContext.current
-    val numberSets by viewModel.numberSets.collectAsState()
-    val selectedCondition by viewModel.selectedCondition.collectAsState()
-    val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
-    val saveMessage by viewModel.saveMessage.collectAsState()
-
+fun MainScreen() {
     var showConditionDialog by remember { mutableStateOf(false) }
-    var selectedSetCount by remember { mutableIntStateOf(5) }
-
-    LaunchedEffect(saveMessage) {
-        saveMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            viewModel.clearSaveMessage()
-        }
-    }
+    var showLogicInfoDialog by remember { mutableStateOf(false) } // 7대 로직 설명 팝업 상태
+    var selectedCondition by remember { mutableStateOf("고도화 종합 분석 (7대 로직 적용)") }
 
     Scaffold(
         topBar = {
@@ -56,6 +32,16 @@ fun AnalysisScreen(
                         color = Color(0xFF1E293B)
                     )
                 },
+                actions = {
+                    // 7대 로직 설명 팝업을 여는 인포 버튼
+                    IconButton(onClick = { showLogicInfoDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "7대 로직 설명",
+                            tint = Color(0xFF0EA5E9)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFFF8FAFC)
                 )
@@ -63,417 +49,157 @@ fun AnalysisScreen(
         },
         containerColor = Color(0xFFF1F5F9)
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(bottom = 24.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. 회차 표시 배너 (1235회 당첨 번호)
-            item {
-                LatestWinBanner(winNumbers = latestWinNumbers)
-            }
-
-            // 2. 스마트 패턴분석 영역
-            item {
-                SmartPatternAnalysisSection(
-                    selectedCount = selectedSetCount,
-                    onCountSelected = { count ->
-                        selectedSetCount = count
-                    },
-                    onGenerateClick = {
-                        viewModel.generateSmartNumbers(selectedSetCount)
-                    }
-                )
-            }
-
-            // 3. 조건변경 배너
-            item {
-                ConditionChangeBanner(
-                    currentCondition = selectedCondition,
-                    onClick = { showConditionDialog = true }
-                )
-            }
-
-            // 4. 생성된 번호 조합 리스트 (카드 섹션)
-            if (numberSets.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "생성된 AI 추천 조합 (${numberSets.size}개)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
-                        )
-                        Button(
-                            onClick = { viewModel.saveNumbers() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF0EA5E9)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text("내역 저장", fontSize = 13.sp, color = Color.White)
-                        }
-                    }
+            // 상단 당첨 번호 배너 영역 예시
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0EA5E9)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "최근 당첨 번호",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "여기에 최근 회차 번호가 표시됩니다",
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
                 }
+            }
 
-                itemsIndexed(numberSets) { index, set ->
-                    LottoSetCard(setIndex = index + 1, numbers = set)
-                }
+            // 분석 조건 선택 버튼
+            OutlinedButton(
+                onClick = { showConditionDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "분석 조건: $selectedCondition",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B)
+                )
             }
         }
     }
 
+    // 1. 분석 조건 선택 팝업 (무작위 추첨 옵션 포함)
     if (showConditionDialog) {
-        ConditionSelectDialog(
-            currentCondition = selectedCondition,
-            onSelect = {
-                viewModel.setCondition(it)
-                showConditionDialog = false
+        AlertDialog(
+            onDismissRequest = { showConditionDialog = false },
+            title = {
+                Text(text = "분석 조건 선택", fontWeight = FontWeight.Bold)
             },
-            onDismiss = { showConditionDialog = false }
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ConditionOptionItem(
+                        title = "고도화 종합 분석 (7대 로직 적용)",
+                        isSelected = selectedCondition.contains("7대 로직")
+                    ) {
+                        selectedCondition = "고도화 종합 분석 (7대 로직 적용)"
+                        showConditionDialog = false
+                    }
+                    
+                    // 무작위 추첨 옵션 추가
+                    ConditionOptionItem(
+                        title = "완전 무작위 추첨 (일반 자동)",
+                        isSelected = selectedCondition.contains("무작위 추첨")
+                    ) {
+                        selectedCondition = "완전 무작위 추첨 (일반 자동)"
+                        showConditionDialog = false
+                    }
+
+                    ConditionOptionItem(
+                        title = "최근 당첨 번호 이월 패턴 분석",
+                        isSelected = selectedCondition.contains("이월 패턴")
+                    ) {
+                        selectedCondition = "최근 당첨 번호 이월 패턴 분석"
+                        showConditionDialog = false
+                    }
+
+                    ConditionOptionItem(
+                        title = "홀짝 / 고저 균형 필터링",
+                        isSelected = selectedCondition.contains("홀짝")
+                    ) {
+                        selectedCondition = "홀짝 / 고저 균형 필터링"
+                        showConditionDialog = false
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showConditionDialog = false }) {
+                    Text(text = "취소", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    // 2. 로또 7대 로직 시스템 설명 팝업
+    if (showLogicInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogicInfoDialog = false },
+            title = {
+                Text(text = "🧠 로또 7대 로직 시스템 안내", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = "본 앱은 아래의 통계적 7대 로직을 적용하여 최적의 번호를 추출합니다.", fontSize = 13.sp, color = Color.DarkGray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "1. 연속 숫자 분석: 과도한 연번 편중 방지", fontSize = 12.sp)
+                    Text(text = "2. 끝자리 합 분포: 일의 자리 수 균형 조절", fontSize = 12.sp)
+                    Text(text = "3. 과거 당첨 번호 중복 제한: 확률 낮은 중복 필터링", fontSize = 12.sp)
+                    Text(text = "4. 미출현 횟수 분석: 콜드 넘버 출현 주기 계산", fontSize = 12.sp)
+                    Text(text = "5. 재등장 간격 분석: 번호별 순환 패턴 파악", fontSize = 12.sp)
+                    Text(text = "6. 합계 흐름 연속 패턴: 6개 번호 총합 구간 유지", fontSize = 12.sp)
+                    Text(text = "7. 고저/홀짝 균형: 1~22 및 홀짝 비율 최적 대칭", fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showLogicInfoDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
+                ) {
+                    Text(text = "확인", color = Color.White)
+                }
+            }
         )
     }
 }
 
-// 회차 정보가 포함된 상단 배너 (1235회 당첨 번호)
 @Composable
-fun LatestWinBanner(winNumbers: List<Int>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
-                    )
-                )
-                .padding(16.dp)
-        ) {
-            Column {
-                Text(
-                    text = "1235회 당첨 번호",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    winNumbers.forEach { number ->
-                        LottoBall(number = number, size = 36)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SmartPatternAnalysisSection(
-    selectedCount: Int,
-    onCountSelected: (Int) -> Unit,
-    onGenerateClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color(0xFF0EA5E9),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "스마트 패턴 분석",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A)
-                )
-            }
-
-            Text(
-                text = "최신 당첨 이월 패턴, 홀짝 균형, 고저 비율 필터를 실시간 반영합니다.",
-                fontSize = 12.sp,
-                color = Color(0xFF64748B),
-                lineHeight = 16.sp
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                listOf(5, 10).forEach { count ->
-                    val isSelected = selectedCount == count
-                    OutlinedButton(
-                        onClick = { onCountSelected(count) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isSelected) Color(0xFFE0F2FE) else Color.Transparent,
-                            contentColor = if (isSelected) Color(0xFF0284C7) else Color(0xFF64748B)
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = Brush.horizontalGradient(
-                                listOf(
-                                    if (isSelected) Color(0xFF0284C7) else Color(0xFFCBD5E1),
-                                    if (isSelected) Color(0xFF0284C7) else Color(0xFFCBD5E1)
-                                )
-                            )
-                        )
-                    ) {
-                        Text(
-                            text = "${count}개 조합",
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = onGenerateClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0EA5E9)
-                )
-            ) {
-                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "AI 추천 번호 생성하기",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ConditionChangeBanner(
-    currentCondition: String,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF0D9488), Color(0xFF10B981))
-                    )
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "적용된 분석 조건",
-                            fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                        Text(
-                            text = currentCondition,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-
-                Surface(
-                    color = Color.White.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Text(
-                        text = "변경",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+fun ConditionOptionItem(title: String, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) Color(0xFFE0F2FE) else Color.Transparent,
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${setIndex}세트",
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF64748B),
-                fontSize = 13.sp
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                numbers.forEach { number ->
-                    LottoBall(number = number, size = 32)
-                }
+            Text(text = title, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+            if (isSelected) {
+                Text(text = "✓", color = Color(0xFF0EA5E9), fontWeight = FontWeight.Bold)
             }
         }
     }
-}
-
-@Composable
-fun LottoBall(number: Int, size: Int = 34) {
-    val ballColor = when (number) {
-        in 1..10 -> Color(0xFFF59E0B)
-        in 11..20 -> Color(0xFF3B82F6)
-        in 21..30 -> Color(0xFFEF4444)
-        in 31..40 -> Color(0xFF64748B)
-        else -> Color(0xFF10B981)
-    }
-
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .background(ballColor, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = number.toString(),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = (size / 2.5).sp
-        )
-    }
-}
-
-@Composable
-fun ConditionSelectDialog(
-    currentCondition: String,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val conditions = listOf(
-        "고도화 종합 분석 (7대 로직 적용)",
-        "최근 당첨 번호 이월 패턴 분석",
-        "홀짝 / 고저 균형 필터링",
-        "끝수 및 연속 번호 조합 제한"
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "분석 조건 선택",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { condition ->
-                    val isSelected = condition == currentCondition
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) Color(0xFFE0F2FE) else Color.Transparent)
-                            .clickable { onSelect(condition) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = condition,
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) Color(0xFF0284C7) else Color(0xFF334155)
-                        )
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color(0xFF0284C7),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = Color(0xFF64748B))
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
-        containerColor = Color.White
-    )
 }
