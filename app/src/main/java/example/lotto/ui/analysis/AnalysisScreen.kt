@@ -1,5 +1,5 @@
-// File Path: app/src/main/java/com/example/lotto/ui/analysis/AnalysisScreen.kt
-package com.example.lotto.ui.analysis
+// File Path: app/src/main/java/com/kimro/ai/lotto/ui/analysis/AnalysisScreen.kt
+package com.kimro.ai.lotto.ui.analysis
 
 import android.widget.Toast
 import androidx.compose.foundation.background
