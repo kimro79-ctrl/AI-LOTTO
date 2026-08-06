@@ -24,7 +24,7 @@ data class PurchaseItem(
 
 @HiltViewModel
 class PurchaseViewModel @Inject constructor(
-    private val purchaseDao: PurchaseDao // Room DB DAO 주입
+    private val purchaseDao: PurchaseDao
 ) : ViewModel() {
 
     private val apiService: LottoApiService by lazy {
@@ -35,10 +35,9 @@ class PurchaseViewModel @Inject constructor(
             .create(LottoApiService::class.java)
     }
 
-    // Room DB의 데이터를 실시간으로 UI용 PurchaseItem 리스트로 변환
     val purchaseList: StateFlow<List<PurchaseItem>> = purchaseDao.getAllPurchases()
-        .map { entities ->
-            entities.map { entity ->
+        .map { entities: List<PurchaseEntity> ->
+            entities.map { entity: PurchaseEntity ->
                 PurchaseItem(
                     id = entity.id,
                     round = entity.round,
@@ -53,7 +52,6 @@ class PurchaseViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    // 새로운 번호 저장 (번호 생성 화면이나 다이어그램에서 호출)
     fun addPurchaseItem(round: Int, numbers: List<Int>) {
         viewModelScope.launch {
             val numbersString = numbers.joinToString(",")
@@ -66,7 +64,6 @@ class PurchaseViewModel @Inject constructor(
         }
     }
 
-    // 특정 회차 당첨 결과 확인 및 DB 업데이트
     fun checkWinningResult(id: Long, targetRound: Int, userNumbers: List<Int>) {
         viewModelScope.launch {
             try {
@@ -79,8 +76,6 @@ class PurchaseViewModel @Inject constructor(
                     val bonusNo = response.bnusNo
 
                     val rank = calculateRank(userNumbers, winningNumbers, bonusNo)
-                    
-                    // DB에 결과 업데이트
                     purchaseDao.updateRankResult(id, rank)
                 }
             } catch (e: Exception) {
