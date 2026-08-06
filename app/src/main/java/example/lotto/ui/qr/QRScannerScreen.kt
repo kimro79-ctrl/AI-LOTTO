@@ -1,11 +1,9 @@
-// File Path: app/src/main/java/com/kimro/ai/lotto/ui/qr/QrScanScreen.kt
 package com.kimro.ai.lotto.ui.qr
 
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -32,14 +30,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.kimro.ai.lotto.ui.purchase.PurchaseViewModel
 import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QrScanScreen() {
+fun QRScannerScreen(
+    purchaseViewModel: PurchaseViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -118,14 +120,17 @@ fun QrScanScreen() {
                                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                         .build()
                                         
-                                    // 중복 실행 방지용 플래그
                                     var isScanned = false
 
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
                                             if (!isScanned && qrResultUrl.contains("dhlottery.co.kr")) {
                                                 isScanned = true
-                                                // 브라우저로 동행복권 당첨 결과 페이지 열기
+
+                                                parseLottoQrUrl(qrResultUrl)?.let { (round, numbers) ->
+                                                    purchaseViewModel.addPurchaseItem(round, numbers)
+                                                }
+
                                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(qrResultUrl))
                                                 ctx.startActivity(intent)
                                             }
@@ -185,6 +190,33 @@ fun QrScanScreen() {
     }
 }
 
+private fun parseLottoQrUrl(url: String): Pair<Int, List<Int>>? {
+    try {
+        val uri = Uri.parse(url)
+        val vParam = uri.getQueryParameter("v") ?: return null
+        val parts = vParam.split("m")
+        if (parts.size >= 2) {
+            val round = parts[0].toIntOrNull() ?: return null
+            val numbersStr = parts[1]
+            val numbers = mutableListOf<Int>()
+            
+            var i = 0
+            while (i < numbersStr.length - 1) {
+                val numStr = numbersStr.substring(i, i + 2)
+                numStr.toIntOrNull()?.let { numbers.add(it) }
+                i += 2
+            }
+
+            if (numbers.isNotEmpty()) {
+                return Pair(round, numbers)
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    return null
+}
+
 private fun processImageProxy(
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
     imageProxy: ImageProxy,
@@ -207,7 +239,6 @@ private fun processImageProxy(
                 }
             }
             .addOnFailureListener {
-                // 실패 시 예외 처리
             }
             .addOnCompleteListener {
                 imageProxy.close()
