@@ -90,7 +90,6 @@ fun QrScanScreen() {
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(24.dp)
             ) {
-                // 카메라 프리뷰가 표시되는 박스 영역
                 Box(
                     modifier = Modifier
                         .size(260.dp)
@@ -100,7 +99,6 @@ fun QrScanScreen() {
                     contentAlignment = Alignment.Center
                 ) {
                     if (hasCameraPermission) {
-                        // 실제 카메라 화면 및 QR 분석기를 띄우는 뷰
                         AndroidView(
                             factory = { ctx ->
                                 val previewView = PreviewView(ctx)
@@ -113,7 +111,6 @@ fun QrScanScreen() {
                                         it.setSurfaceProvider(previewView.surfaceProvider)
                                     }
                                     
-                                    // QR 코드 분석기 설정 (Google ML Kit 활용)
                                     val scanner = BarcodeScanning.getClient()
                                     val imageAnalysis = ImageAnalysis.Builder()
                                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -121,9 +118,7 @@ fun QrScanScreen() {
                                         
                                     imageAnalysis.setAnalyzer(executor) { imageProxy ->
                                         processImageProxy(scanner, imageProxy) { qrResultUrl ->
-                                            // QR 코드가 인식되었을 때 실행될 로직 (동행복권 URL 결과 처리)
                                             Toast.makeText(ctx, "인식된 결과: $qrResultUrl", Toast.LENGTH_LONG).show()
-                                            // 필요시 웹뷰 이동 또는 결과 처리 로직 추가
                                         }
                                     }
 
@@ -135,7 +130,7 @@ fun QrScanScreen() {
                                             lifecycleOwner,
                                             cameraSelector,
                                             preview,
-                                            imageAnalysis // 분석기 바인딩 추가
+                                            imageAnalysis
                                         )
                                     } catch (e: Exception) {
                                         e.printStackTrace()
@@ -180,7 +175,6 @@ fun QrScanScreen() {
     }
 }
 
-// 실시간 카메라 이미지에서 QR 코드를 추출하는 유틸 함수
 private fun processImageProxy(
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
     imageProxy: ImageProxy,
@@ -205,7 +199,7 @@ private fun processImageProxy(
             .addOnFailureListener {
                 // 실패 시 예외 처리
             }
-            .addOnCompleteLiistener {
+            .addOnCompleteListener {
                 imageProxy.close()
             }
     } else {
