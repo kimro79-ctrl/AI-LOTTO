@@ -1,7 +1,6 @@
-// File Path: app/src/main/java/example/lotto/ui/main/MainScreen.kt
-package example.lotto.ui.main
+// File Path: app/src/main/java/com/example/lotto/ui/main/AnalysisScreen.kt
+package com.example.lotto.ui.main
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,9 +16,9 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun AnalysisScreen() {
     var showConditionDialog by remember { mutableStateOf(false) }
-    var showLogicInfoDialog by remember { mutableStateOf(false) } // 7대 로직 설명 팝업 상태
+    var showLogicInfoDialog by remember { mutableStateOf(false) }
     var selectedCondition by remember { mutableStateOf("고도화 종합 분석 (7대 로직 적용)") }
 
     Scaffold(
@@ -33,7 +32,6 @@ fun MainScreen() {
                     )
                 },
                 actions = {
-                    // 7대 로직 설명 팝업을 여는 인포 버튼
                     IconButton(onClick = { showLogicInfoDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Info,
@@ -57,7 +55,6 @@ fun MainScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 상단 당첨 번호 배너 영역 예시
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0EA5E9)),
@@ -79,7 +76,6 @@ fun MainScreen() {
                 }
             }
 
-            // 분석 조건 선택 버튼
             OutlinedButton(
                 onClick = { showConditionDialog = true },
                 modifier = Modifier
@@ -96,7 +92,6 @@ fun MainScreen() {
         }
     }
 
-    // 1. 분석 조건 선택 팝업 (무작위 추첨 옵션 포함)
     if (showConditionDialog) {
         AlertDialog(
             onDismissRequest = { showConditionDialog = false },
@@ -113,7 +108,6 @@ fun MainScreen() {
                         showConditionDialog = false
                     }
                     
-                    // 무작위 추첨 옵션 추가
                     ConditionOptionItem(
                         title = "완전 무작위 추첨 (일반 자동)",
                         isSelected = selectedCondition.contains("무작위 추첨")
@@ -147,7 +141,6 @@ fun MainScreen() {
         )
     }
 
-    // 2. 로또 7대 로직 시스템 설명 팝업
     if (showLogicInfoDialog) {
         AlertDialog(
             onDismissRequest = { showLogicInfoDialog = false },
