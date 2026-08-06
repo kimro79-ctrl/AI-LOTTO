@@ -1,7 +1,7 @@
-// app/src/main/java/com/kimro/ai/lotto/data/PurchaseDao.kt
 package com.kimro.ai.lotto.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -17,4 +17,12 @@ interface PurchaseDao {
 
     @Query("UPDATE purchase_table SET rankResult = :result WHERE id = :id")
     suspend fun updateRankResult(id: Long, result: String)
+
+    // 항목 단건 삭제 기능 추가
+    @Delete
+    suspend fun deletePurchase(purchase: PurchaseEntity)
+
+    // 전체 내역 삭제 기능 추가 (필요시 사용)
+    @Query("DELETE FROM purchase_table")
+    suspend fun deleteAllPurchases()
 }
