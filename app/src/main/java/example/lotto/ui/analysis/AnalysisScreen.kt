@@ -1,7 +1,5 @@
 package com.kimro.ai.lotto.ui.analysis
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,8 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +25,6 @@ import androidx.compose.ui.unit.sp
 fun AnalysisScreen() {
     var selectedTab by remember { mutableStateOf("고도화 종합 분석") }
     var numbers by remember { mutableStateOf(listOf(7, 14, 22, 31, 38, 42)) }
-    var isAnimating by remember { mutableStateOf(false) }
 
     // 그라데이션 브러시 정의 (세련된 블루-퍼플 계열)
     val cardGradient = Brush.linearGradient(
@@ -79,13 +76,13 @@ fun AnalysisScreen() {
                             .background(Color.White, CircleShape)
                             .shadow(4.dp, CircleShape)
                     ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = "AI", tint = Color(0xFF6366F1))
+                        Icon(Icons.Default.Star, contentDescription = "AI", tint = Color(0xFF6366F1))
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // [핵심] 그라데이션 및 입체 그림자가 적용된 메인 결과 카드
+                // 그라데이션 및 입체 그림자가 적용된 메인 결과 카드
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -137,7 +134,7 @@ fun AnalysisScreen() {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // [핵심] 구체적인 AI 분석 근거 배지 (툴팁 형태)
+                        // 구체적인 AI 분석 근거 배지 (툴팁 형태)
                         Surface(
                             color = Color.Black.copy(alpha = 0.25f),
                             shape = RoundedCornerShape(16.dp)
@@ -147,7 +144,7 @@ fun AnalysisScreen() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.AutoAwesome,
+                                    Icons.Default.Star,
                                     contentDescription = null,
                                     tint = Color(0xFF38BDF8),
                                     modifier = Modifier.size(14.dp)
@@ -166,7 +163,7 @@ fun AnalysisScreen() {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 분석 조건 선택 버튼 (디자인 개선)
+                // 분석 조건 선택 버튼
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -205,7 +202,7 @@ fun AnalysisScreen() {
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // 번호 생성 버튼 (그라데이션 입체 버튼)
+                // 번호 생성 버튼
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -214,7 +211,6 @@ fun AnalysisScreen() {
                         .clip(RoundedCornerShape(16.dp))
                         .background(cardGradient)
                         .clickable {
-                            // 번호 갱신 시뮬레이션
                             numbers = (1..45).shuffled().take(6).sorted()
                         },
                     contentAlignment = Alignment.Center
@@ -237,15 +233,14 @@ fun AnalysisScreen() {
     }
 }
 
-// 로또 공 디자인 컴포넌트 (색상별 번호 스타일링)
 @Composable
 fun LottoBall(number: Int) {
     val ballColor = when (number) {
-        in 1..10 -> Color(0xFFFACC15)   // 노란색
-        in 11..20 -> Color(0xFF38BDF8)  // 파란색
-        in 21..30 -> Color(0xFFF87171)  // 빨간색
-        in 31..40 -> Color(0xFF94A3B8)  // 회색
-        else -> Color(0xFF4ADE80)       // 초록색
+        in 1..10 -> Color(0xFFFACC15)
+        in 11..20 -> Color(0xFF38BDF8)
+        in 21..30 -> Color(0xFFF87171)
+        in 31..40 -> Color(0xFF94A3B8)
+        else -> Color(0xFF4ADE80)
     }
 
     Box(
