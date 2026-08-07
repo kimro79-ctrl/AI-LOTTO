@@ -1,34 +1,14 @@
-// app/src/main/java/com/kimro/ai/lotto/di/DatabaseModule.kt
 package com.kimro.ai.lotto.di
 
-import android.content.Context
-import androidx.room.Room
-import com.kimro.ai.lotto.data.AppDatabase
-import com.kimro.ai.lotto.data.PurchaseDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "lotto_database"
-        ).fallbackToDestructiveMigration().build()
-    }
-
-    @Provides
-    @Singleton
-    fun providePurchaseDao(database: AppDatabase): PurchaseDao {
-        return database.purchaseDao()
-    }
+    // 현재 Room 관련 코드를 사용하지 않으므로 내용을 비워둡니다.
+    // 추후 데이터베이스를 다시 사용하게 될 때 여기에 @Provides 코드를 추가하세요.
 }
