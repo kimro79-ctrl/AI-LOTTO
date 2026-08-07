@@ -39,7 +39,6 @@ fun QrScanScreen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
 
-    // 중복 실행 방지 플래그
     var isScanned by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(
@@ -89,14 +88,21 @@ fun QrScanScreen() {
                                                         .addOnSuccessListener { barcodes ->
                                                             val url = barcodes.firstOrNull()?.rawValue
                                                             if (!url.isNullOrEmpty() && !isScanned) {
-                                                                isScanned = true // 최초 1회만 실행되도록 잠금
+                                                                isScanned = true
                                                                 try {
-                                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                                                    ctx.startActivity(intent)
+                                                                    // 안전한 애플리케이션 컨텍스트 및 새 태스크 플래그 추가로 튕김 방지
+                                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                    }
+                                                                    context.applicationContext.startActivity(intent)
                                                                 } catch (e: Exception) {
                                                                     e.printStackTrace()
+                                                                    isScanned = false // 실패 시 다시 스캔 가능하도록 복구
                                                                 }
                                                             }
+                                                        }
+                                                        .addOnFailureListener {
+                                                            // 무시
                                                         }
                                                         .addOnCompleteListener {
                                                             imageProxy.close()
