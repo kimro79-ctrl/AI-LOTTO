@@ -9,6 +9,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-    // 현재 Room 관련 코드를 사용하지 않으므로 내용을 비워둡니다.
-    // 추후 데이터베이스를 다시 사용하게 될 때 여기에 @Provides 코드를 추가하세요.
+    // Dao와 Database 코드를 모두 제거했으므로, 
+    // 빌드 에러가 나지 않도록 모듈 내용만 남겨둡니다.
 }
