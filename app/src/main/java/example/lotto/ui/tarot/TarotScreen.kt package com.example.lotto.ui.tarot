@@ -2,8 +2,9 @@
 package com.kimro.ai.lotto.ui.tarot
 
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,13 +14,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -33,13 +34,12 @@ fun TarotScreen(
 ) {
     var selectedSetCount by remember { mutableStateOf(5) }
     
-    // 사용자가 터치한 카드 인덱스 (0, 1, 2)와 각 카드에 매칭될 타로 이름/컬러 저장
+    // 선택된 카드 인덱스 관리 (null이면 미선택, 0~2이면 해당 카드 선택됨)
     var selectedCardIndex by remember { mutableStateOf<Int?>(null) }
-    var isFlipped by remember { mutableStateOf(false) }
     
-    // 뽑힌 카드의 고유 디자인 속성을 저장하기 위한 상태
+    // 선택된 카드의 시각적 속성
     var revealedCardTitle by remember { mutableStateOf("") }
-    var revealedCardColor by remember { mutableStateOf(Color(0xFFFFD166)) }
+    var revealedCardColor by remember { mutableStateOf(Color(0xFF6366F1)) }
 
     val tarotCardName by viewModel.tarotCardName.collectAsState()
     val tarotMeaning by viewModel.tarotMeaning.collectAsState()
@@ -107,59 +107,55 @@ fun TarotScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "아래 3장의 카드 중 오늘의 운세를 담은 한 장을 선택하세요",
+            text = if (selectedCardIndex == null) "아래 3장의 카드 중 오늘의 운세를 담은 한 장을 선택하세요" else "✨ 카드가 선택되었습니다! 아래 결과를 확인하세요",
             fontSize = 13.sp,
-            color = Color.Gray,
-            fontWeight = FontWeight.Medium
+            color = if (selectedCardIndex == null) Color.Gray else Color(0xFF6366F1),
+            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 3장의 타로 카드 배치 영역 (뒤집기 애니메이션 포함)
+        // [핵심 개선] 3장의 타로 카드 배치 (선택 시 즉시 앞면 디자인으로 전환)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             for (i in 0..2) {
                 val isSelected = selectedCardIndex == i
-                
-                // 카드가 뒤집히는 회전각 애니메이션 (0도 -> 180도)
-                val rotation by animateFloatAsState(
-                    targetValue = if (isSelected && isFlipped) 180f else 0f,
-                    animationSpec = tween(durationMillis = 600),
-                    label = "CardFlip"
+                val isAnySelected = selectedCardIndex != null
+
+                // 선택 여부에 따라 카드 배경색을 부드럽게 애니메이션 전환
+                val cardBackgroundColor by animateColorAsState(
+                    targetValue = when {
+                        isSelected -> revealedCardColor
+                        isAnySelected -> Color(0xFFCBD5E1) // 선택되지 않은 남은 카드들은 흐리게 처리
+                        else -> Color(0xFF4A4E69)        // 선택 전 기본 뒷면 색상
+                    },
+                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                    label = "CardColor"
                 )
 
                 Card(
                     modifier = Modifier
                         .width(105.dp)
                         .height(150.dp)
-                        .graphicsLayer {
-                            rotationY = rotation
-                            cameraDistance = 12f * density
-                        }
-                        .clickable {
-                            if (selectedCardIndex == null) {
-                                selectedCardIndex = i
-                                isFlipped = true
-                                viewModel.drawTarotCard(selectedSetCount)
-                                
-                                // 카드 종류에 따른 앞면 디자인 매핑
-                                val possibleCards = listOf(
-                                    Triple("마법사", Color(0xFF38BDF8), Icons.Default.AutoAwesome),
-                                    Triple("여황제", Color(0xFFF472B6), Icons.Default.Star),
-                                    Triple("운명의 루비", Color(0xFFFACC15), Icons.Default.AutoAwesome),
-                                    Triple("태양", Color(0xFFFB923C), Icons.Default.Star)
-                                )
-                                val chosen = possibleCards.random()
-                                revealedCardTitle = chosen.first
-                                revealedCardColor = chosen.second
-                            }
+                        .shadow(if (isSelected) 12.dp else 4.dp, RoundedCornerShape(16.dp))
+                        .clickable(enabled = selectedCardIndex == null) {
+                            selectedCardIndex = i
+                            viewModel.drawTarotCard(selectedSetCount)
+                            
+                            // 카드 종류에 따른 앞면 디자인 및 컬러 설정
+                            val cardStyles = listOf(
+                                Triple("마법사", Color(0xFF0284C7)),
+                                Triple("여황제", Color(0xFFDB2777)),
+                                Triple("운명의 루비", Color(0xFFD97706)),
+                                Triple("태양의 기운", Color(0xFFEA580C))
+                            )
+                            val chosen = cardStyles.random()
+                            revealedCardTitle = chosen.first
+                            revealedCardColor = chosen.second
                         },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (rotation <= 90f) Color(0xFF4A4E69) else revealedCardColor
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBackgroundColor),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(
@@ -168,46 +164,39 @@ fun TarotScreen(
                             .padding(8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (rotation <= 90f) {
-                            // [카드 뒷면]
+                        if (!isSelected) {
+                            // [카드 뒷면 또는 비활성화 카드]
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "★", color = Color(0xFFFFD166), fontSize = 18.sp)
+                                Text(text = "★", color = Color(0xFFFFD166), fontSize = 16.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "TAROT\n카드 ${i + 1}",
+                                    text = if (isAnySelected) "선택됨" else "TAROT\n카드 ${i + 1}",
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        } else {
+                            // [선택된 카드 앞면]
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = revealedCardTitle,
                                     color = Color.White,
                                     textAlign = TextAlign.Center,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
-                            }
-                        } else {
-                            // [카드 앞면] 글자 반전 보정
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { rotationY = 180f },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = revealedCardTitle,
-                                        color = Color.White,
-                                        textAlign = TextAlign.Center,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                }
                             }
                         }
                     }
@@ -222,7 +211,6 @@ fun TarotScreen(
             Button(
                 onClick = {
                     selectedCardIndex = null
-                    isFlipped = false
                 },
                 modifier = Modifier.height(36.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2E2E2)),
@@ -254,7 +242,7 @@ fun TarotScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (tarotCardName != null && isFlipped) {
+            if (tarotCardName != null && selectedCardIndex != null) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -310,7 +298,7 @@ fun TarotScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "마음에 드는 카드를 터치하여 뒤집어보세요",
+                            text = "마음에 드는 카드를 터치하여 운세를 확인해보세요",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyMedium
                         )
