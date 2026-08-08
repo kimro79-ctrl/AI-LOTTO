@@ -40,6 +40,7 @@ fun AnalysisScreen(
     val saveMessage by viewModel.saveMessage.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
+    var showLogicInfoDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
 
     LaunchedEffect(saveMessage) {
@@ -98,6 +99,32 @@ fun AnalysisScreen(
                     currentCondition = selectedCondition,
                     onClick = { showConditionDialog = true }
                 )
+            }
+
+            // 3-1. 7대 로직이 무엇인지 설명하는 링크
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLogicInfoDialog = true }
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "7대 로직이 뭔가요?",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0D9488)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = "→",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0D9488)
+                    )
+                }
             }
 
             // 4. 생성된 번호 조합 리스트 (카드 섹션) - 카드마다 펼쳐서 상세 분석을 볼 수 있음
@@ -159,6 +186,76 @@ fun AnalysisScreen(
             onDismiss = { showConditionDialog = false }
         )
     }
+
+    if (showLogicInfoDialog) {
+        LogicInfoDialog(onDismiss = { showLogicInfoDialog = false })
+    }
+}
+
+// 7대 로직 각각에 대한 이름 + 짧은 설명
+private data class LogicInfoItem(val title: String, val description: String)
+
+private val sevenLogics = listOf(
+    LogicInfoItem("① 홀짝 균형", "홀수와 짝수 개수를 3:3에 가깝게 맞춰 극단적인 편중을 방지합니다."),
+    LogicInfoItem("② 고저 균형", "1~22(저구간)와 23~45(고구간)의 번호 개수를 고르게 배분합니다."),
+    LogicInfoItem("③ 연속번호 제한", "번호가 연달아 이어지는 조합(예: 12,13)을 배제합니다."),
+    LogicInfoItem("④ 끝수 분산", "끝자리 숫자가 3개 이상 겹치지 않도록 분산시킵니다."),
+    LogicInfoItem("⑤ 총합 적정구간", "6개 번호의 합이 통계적으로 흔한 100~175 구간에 들도록 유도합니다."),
+    LogicInfoItem("⑥ 이월수 반영", "직전 회차 당첨번호 중 일부를 확률적으로 포함시켜 이월 패턴을 반영합니다."),
+    LogicInfoItem("⑦ 구간 분포", "1~45를 5개 구간으로 나눠 번호가 여러 구간에 고르게 퍼지도록 합니다.")
+)
+
+@Composable
+fun LogicInfoDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "고도화 종합 분석 - 7대 로직",
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = Color(0xFF0F172A)
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                sevenLogics.forEach { logic ->
+                    Column {
+                        Text(
+                            text = logic.title,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0D9488)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = logic.description,
+                            fontSize = 12.sp,
+                            color = Color(0xFF475569),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "생성된 각 조합의 '상세 분석 보기'에서 이 7가지 지표를 조합별로 직접 확인할 수 있습니다.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 15.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("확인", color = Color(0xFF0EA5E9), fontWeight = FontWeight.Bold)
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+        containerColor = Color.White
+    )
 }
 
 // 회차 정보가 포함된 상단 배너 (1235회 당첨 번호)
@@ -357,16 +454,28 @@ fun ConditionChangeBanner(
                 }
 
                 Surface(
-                    color = Color.White.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(20.dp)
+                    color = Color.White,
+                    shape = RoundedCornerShape(20.dp),
+                    shadowElevation = 2.dp
                 ) {
-                    Text(
-                        text = "변경",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "변경",
+                            color = Color(0xFF0D9488),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "›",
+                            color = Color(0xFF0D9488),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
                 }
             }
         }
