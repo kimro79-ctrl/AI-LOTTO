@@ -138,7 +138,8 @@ fun FortuneScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 3장의 카드 - 선택한 카드만 색이 바뀌고, 다른 카드를 누르면 언제든 다시 바뀐다
+        // 3장의 카드 - 한 장을 선택하면 그 카드만 색이 바뀌고, 나머지는 잠겨서 더 이상 눌리지 않는다.
+        // "카드 다시 뽑기"를 눌러야 다시 선택할 수 있다.
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -147,6 +148,7 @@ fun FortuneScreen(
                 CardBackItem(
                     cardIndex = index + 1,
                     isSelected = selectedCardIndex == index,
+                    isLocked = selectedCardIndex != null,
                     onClick = { viewModel.selectTarotCard(index) }
                 )
             }
@@ -273,14 +275,21 @@ fun FortuneScreen(
 }
 
 /**
+/**
  * 카드 뒷면 컴포넌트.
- * isSelected가 true인 카드만 골드색으로 하이라이트되고, 나머지는 기본 보라색을 유지한다.
- * 재선택이 자유롭기 때문에 클릭 제한을 걸지 않는다 - 언제든 다른 카드를 눌러 선택을 바꿀 수 있음.
+ * isSelected가 true인 카드만 골드색으로 하이라이트된다.
+ * isLocked가 true(이미 한 장을 선택한 상태)이면 클릭이 아예 먹히지 않는다.
+ * "카드 다시 뽑기"를 눌러 drawTarotCards()가 호출되면 selectedCardIndex가 null로
+ * 초기화되면서 잠금도 함께 풀린다.
  */
 @Composable
-fun CardBackItem(cardIndex: Int, isSelected: Boolean, onClick: () -> Unit) {
+fun CardBackItem(cardIndex: Int, isSelected: Boolean, isLocked: Boolean, onClick: () -> Unit) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) Color(0xFFFFD700) else Color(0xFF512DA8),
+        targetValue = when {
+            isSelected -> Color(0xFFFFD700)
+            isLocked -> Color(0xFF512DA8).copy(alpha = 0.4f) // 선택되지 않은 채 잠긴 카드는 살짝 흐리게
+            else -> Color(0xFF512DA8)
+        },
         label = "cardBackColor"
     )
 
@@ -289,7 +298,7 @@ fun CardBackItem(cardIndex: Int, isSelected: Boolean, onClick: () -> Unit) {
             .size(width = 95.dp, height = 135.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .clickable { onClick() },
+            .clickable(enabled = !isLocked) { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
