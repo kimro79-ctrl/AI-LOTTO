@@ -37,6 +37,7 @@ fun AnalysisScreen(
     val numberSets by viewModel.numberSets.collectAsState()
     val selectedCondition by viewModel.selectedCondition.collectAsState()
     val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
+    val latestRound by viewModel.latestRound.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
@@ -77,7 +78,7 @@ fun AnalysisScreen(
         ) {
             // 1. 회차 표시 배너 (1235회 당첨 번호)
             item {
-                LatestWinBanner(winNumbers = latestWinNumbers)
+                LatestWinBanner(winNumbers = latestWinNumbers, round = latestRound)
             }
 
             // 2. 스마트 패턴분석 영역
@@ -259,9 +260,9 @@ fun LogicInfoDialog(onDismiss: () -> Unit) {
     )
 }
 
-// 회차 정보가 포함된 상단 배너 (1235회 당첨 번호)
+// 회차 정보가 포함된 상단 배너 (실제 조회된 최신 회차를 동적으로 표시)
 @Composable
-fun LatestWinBanner(winNumbers: List<Int>) {
+fun LatestWinBanner(winNumbers: List<Int>, round: Int?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -278,7 +279,7 @@ fun LatestWinBanner(winNumbers: List<Int>) {
         ) {
             Column {
                 Text(
-                    text = "1235회 당첨 번호",
+                    text = if (round != null) "${round}회 당첨 번호" else "최신 당첨 번호 불러오는 중...",
                     color = Color.White.copy(alpha = 0.9f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
