@@ -217,6 +217,16 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 조합 하나만 골라서 내역에 저장한다. (전체 저장과 별개로, 마음에 드는 조합만 개별 저장할 때 사용)
+     */
+    fun saveSingleSet(numbers: List<Int>) {
+        viewModelScope.launch {
+            repository.insertLotto(numbers, "ANALYSIS")
+            _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
+        }
+    }
+
     fun saveExternalNumbers(sets: List<List<Int>>) {
         if (sets.isNotEmpty()) {
             viewModelScope.launch {
