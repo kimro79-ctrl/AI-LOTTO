@@ -3,25 +3,40 @@ package com.kimro.ai.lotto.ui.tarot
 
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,19 +46,16 @@ fun TarotScreen(
     viewModel: TarotViewModel = hiltViewModel()
 ) {
     var selectedSetCount by remember { mutableStateOf(5) }
-    
-    // 카드 선택 상태 (null: 미선택, 0~2: 선택된 카드 인덱스)
-    var selectedCardIndex by remember { mutableStateOf<Int?>(null) }
-    
-    // 선택된 카드의 고유 컬러와 이름 저장
-    var revealedCardColor by remember { mutableStateOf(Color(0xFF6366F1)) }
 
     val tarotCardName by viewModel.tarotCardName.collectAsState()
-    val tarotMeaning by viewModel.tarotMeaning.collectAsState()
+    val tarotMeaningPositive by viewModel.tarotMeaningPositive.collectAsState()
+    val tarotMeaningNegative by viewModel.tarotMeaningNegative.collectAsState()
+    val tarotCardOptions by viewModel.tarotCardOptions.collectAsState()
+    val selectedCardIndex by viewModel.selectedCardIndex.collectAsState()
     val generatedTarotSets by viewModel.generatedTarotSets.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
 
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     LaunchedEffect(saveMessage) {
         saveMessage?.let {
@@ -66,7 +78,7 @@ fun TarotScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 조합 개수 선택 버튼 (5개 / 10개)
+        // 파스텔톤 배너 버튼 영역 (5개 조합 / 10개 조합)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -101,117 +113,37 @@ fun TarotScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = if (selectedCardIndex == null) "아래 3장의 카드 중 오늘의 운세를 담은 한 장을 선택하세요" else "✨ 운세와 현실 조언이 확인되었습니다!",
-            fontSize = 13.sp,
-            color = if (selectedCardIndex == null) Color.Gray else Color(0xFF6366F1),
-            fontWeight = FontWeight.Bold
-        )
-
         Spacer(modifier = Modifier.height(12.dp))
 
-        // [핵심 수정] 3장의 카드 배치 및 선택 시 즉각적인 색상/디자인 변화 적용
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Button(
+            onClick = { viewModel.drawTarotCard(selectedSetCount) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA0C4FF)),
+            shape = RoundedCornerShape(12.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
         ) {
-            for (i in 0..2) {
-                val isThisSelected = selectedCardIndex == i
-                val isAnySelected = selectedCardIndex != null
-
-                // 선택된 카드는 화려한 컬러, 나머지는 어두운 회색으로 즉시 전환
-                val cardColor by animateColorAsState(
-                    targetValue = when {
-                        isThisSelected -> revealedCardColor
-                        isAnySelected -> Color(0xFF94A3B8) // 다른 선택 안 된 카드들
-                        else -> Color(0xFF4A4E69)        // 초기 기본 뒷면 색상
-                    },
-                    animationSpec = spring(stiffness = Spring.StiffnessLow),
-                    label = "CardColorAnim"
-                )
-
-                Card(
-                    modifier = Modifier
-                        .width(105.dp)
-                        .height(150.dp)
-                        .shadow(if (isThisSelected) 12.dp else 4.dp, RoundedCornerShape(16.dp))
-                        .clickable(enabled = selectedCardIndex == null) {
-                            selectedCardIndex = i
-                            viewModel.drawTarotCard(selectedSetCount)
-                            
-                            // 뽑힐 때마다 매번 달라지는 카드 고유 테마 컬러
-                            val cardColors = listOf(
-                                Color(0xFF0284C7), // 파랑
-                                Color(0xFFDB2777), // 핑크
-                                Color(0xFFD97706), // 골드
-                                Color(0xFFEA580C)  // 오렌지
-                            )
-                            revealedCardColor = cardColors.random()
-                        },
-                    colors = CardDefaults.cardColors(containerColor = cardColor),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!isThisSelected) {
-                            // 선택 전이거나 다른 카드일 때
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "★", color = Color(0xFFFFD166), fontSize = 16.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isAnySelected) "확인 완료" else "TAROT\n카드 ${i + 1}",
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        } else {
-                            // 내가 선택한 카드 앞면 느낌
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "선택한 카드",
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            Text(text = "타로 카드 뽑기", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF222222))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 다른 카드 다시 고르기 버튼
-        if (selectedCardIndex != null) {
-            Button(
-                onClick = { selectedCardIndex = null },
-                modifier = Modifier.height(36.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2E2E2)),
-                shape = RoundedCornerShape(8.dp)
+        // 3장의 카드 후보 - 선택한 카드만 색이 변하고, 다른 카드를 누르면 언제든 다시 바뀐다
+        if (tarotCardOptions.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text(text = "다른 카드 다시 고르기", fontSize = 12.sp, color = Color(0xFF333333))
+                tarotCardOptions.forEachIndexed { index, card ->
+                    TarotCardOptionItem(
+                        cardName = card.name,
+                        isSelected = selectedCardIndex == index,
+                        onClick = { viewModel.selectTarotCard(index) }
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         if (generatedTarotSets.isNotEmpty()) {
@@ -221,8 +153,7 @@ fun TarotScreen(
                     .fillMaxWidth()
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCAFFBF)),
-                shape = RoundedCornerShape(10.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Text(text = "추출된 ${generatedTarotSets.size}개 타로 조합 내역에 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF222222))
             }
@@ -235,7 +166,7 @@ fun TarotScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (tarotCardName != null && selectedCardIndex != null) {
+            if (tarotCardName != null) {
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -250,35 +181,40 @@ fun TarotScreen(
                                 color = Color(0xFF555555),
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 긍정(정방향) 풀이
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = "🌞 긍정  ",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = tarotMeaningPositive ?: "",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF444444),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            
-                            // 긍정적 의미와 ⚠️ [쓴소리 조언] 영역을 완벽하게 분리 출력
-                            val fullMeaning = tarotMeaning ?: ""
-                            val parts = fullMeaning.split("\n\n⚠️")
-                            val positiveText = parts.getOrNull(0) ?: fullMeaning
-                            val warningText = if (parts.size > 1) "⚠️${parts[1]}" else null
 
-                            Text(
-                                text = positiveText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF444444)
-                            )
-
-                            if (warningText != null) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Surface(
-                                    color = Color(0xFFFFADAD).copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = warningText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF991B1B),
-                                        modifier = Modifier.padding(10.dp)
-                                    )
-                                }
+                            // 부정(역방향) 풀이
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = "🌧️ 주의  ",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFC62828),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = tarotMeaningNegative ?: "",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF444444),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
                         }
                     }
@@ -310,21 +246,81 @@ fun TarotScreen(
                         }
                     }
                 }
-            } else {
+            } else if (tarotCardOptions.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp),
+                            .height(200.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "마음에 드는 카드를 터치하여 운세를 확인해보세요",
+                            text = "버튼을 눌러 오늘의 타로 카드를 뽑아보세요",
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
+            } else {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "마음에 드는 카드 한 장을 선택하세요",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 3장 중 한 장을 나타내는 카드 컴포넌트.
+ * isSelected가 true인 카드만 골드색으로 하이라이트되고, 나머지는 기본 색을 유지한다.
+ * 재선택이 자유롭기 때문에 클릭 제한(enabled)을 걸지 않는다 - 언제든 다른 카드를 눌러 바꿀 수 있음.
+ */
+@Composable
+fun TarotCardOptionItem(
+    cardName: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFFFFD166) else Color(0xFFCBD5FF),
+        label = "tarotCardColor"
+    )
+
+    Card(
+        modifier = Modifier
+            .size(width = 92.dp, height = 132.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "🔮",
+                    fontSize = 26.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = cardName.substringAfter(". ").substringBefore(" ("),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) Color(0xFF333333) else Color(0xFF555555)
+                )
             }
         }
     }
