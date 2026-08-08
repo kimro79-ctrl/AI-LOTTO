@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width // <-- 이 임포트가 빠져서 빌드가 실패했던 것입니다.
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -48,7 +49,6 @@ fun HistoryScreen(
 ) {
     val historyList by viewModel.historyList.collectAsState()
     
-    // 전체 삭제 확인 다이얼로그 상태 관리
     var showClearAllDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -56,7 +56,6 @@ fun HistoryScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // 상단 타이틀 및 전체 삭제 버튼 영역
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -71,7 +70,6 @@ fun HistoryScreen(
                 fontSize = 22.sp
             )
 
-            // 전체 삭제 버튼 (내역이 있을 때만 표시)
             if (historyList.isNotEmpty()) {
                 IconButton(
                     onClick = { showClearAllDialog = true },
@@ -114,7 +112,6 @@ fun HistoryScreen(
         }
     }
 
-    // 전체 삭제 확인 다이얼로그
     if (showClearAllDialog) {
         AlertDialog(
             onDismissRequest = { showClearAllDialog = false },
@@ -122,7 +119,7 @@ fun HistoryScreen(
             text = { Text("저장된 모든 번호 내역을 영구적으로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteAllHistory() // 전체 삭제 함수 연결 완료
+                    viewModel.deleteAllHistory()
                     showClearAllDialog = false
                 }) {
                     Text("전체 삭제", color = Color.Red)
@@ -150,8 +147,6 @@ fun HistoryItem(
     }
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
-
-    // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
     val hasRound = entity.round > 0
 
     Card(
