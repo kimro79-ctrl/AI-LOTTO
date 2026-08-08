@@ -1,3 +1,4 @@
+// File Path: app/src/main/java/com/kimro/ai/lotto/di/AppModule.kt
 package com.kimro.ai.lotto.di
 
 import android.content.Context
@@ -26,7 +27,11 @@ object AppModule {
             context,
             LottoDatabase::class.java,
             "lotto_db"
-        ).build()
+        )
+            // round 컬럼을 추가하는 마이그레이션. 이걸 등록하지 않으면 버전이 올라갈 때
+            // 기존 사용자 데이터가 통째로 삭제되므로 반드시 필요하다.
+            .addMigrations(LottoDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
