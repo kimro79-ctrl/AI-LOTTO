@@ -169,7 +169,8 @@ fun AnalysisScreen(
                         setIndex = index + 1,
                         numbers = set,
                         latestWinNumbers = latestWinNumbers,
-                        initiallyExpanded = index == 0
+                        initiallyExpanded = index == 0,
+                        onSaveClick = { viewModel.saveSingleSet(set) }
                     )
                 }
             }
@@ -490,9 +491,11 @@ fun LottoSetCard(
     setIndex: Int,
     numbers: List<Int>,
     latestWinNumbers: List<Int>,
-    initiallyExpanded: Boolean = false
+    initiallyExpanded: Boolean = false,
+    onSaveClick: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    var saved by remember(numbers) { mutableStateOf(false) }
     val analysis = remember(numbers, latestWinNumbers) {
         analyzeLottoSet(numbers, latestWinNumbers)
     }
@@ -558,6 +561,47 @@ fun LottoSetCard(
                 HorizontalDivider(color = Color(0xFFF1F5F9))
                 Spacer(modifier = Modifier.height(12.dp))
                 AnalysisReportSection(analysis)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        onSaveClick()
+                        saved = true
+                    },
+                    enabled = !saved,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (saved) Color(0xFFE2E8F0) else Color(0xFF10B981),
+                        disabledContainerColor = Color(0xFFE2E8F0)
+                    )
+                ) {
+                    if (saved) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "이 조합 저장됨",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B)
+                        )
+                    } else {
+                        Text(
+                            text = "이 조합만 저장하기",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
     }
