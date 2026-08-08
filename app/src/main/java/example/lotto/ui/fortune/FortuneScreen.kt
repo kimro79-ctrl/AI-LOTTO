@@ -2,6 +2,7 @@
 package com.kimro.ai.lotto.ui.fortune
 
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,11 +49,19 @@ fun FortuneScreen(
     var selectedSetCount by remember { mutableStateOf(5) }
 
     val tarotCardName by viewModel.tarotCardName.collectAsState()
-    val tarotMeaning by viewModel.tarotMeaning.collectAsState()
+    val tarotMeaningPositive by viewModel.tarotMeaningPositive.collectAsState()
+    val tarotMeaningNegative by viewModel.tarotMeaningNegative.collectAsState()
+    val tarotCardOptions by viewModel.tarotCardOptions.collectAsState()
+    val selectedCardIndex by viewModel.selectedCardIndex.collectAsState()
     val generatedTarotSets by viewModel.generatedTarotSets.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
 
     val context = LocalContext.current
+
+    // 화면에 처음 들어왔을 때 카드 3장을 미리 뽑아둔다
+    LaunchedEffect(Unit) {
+        viewModel.drawTarotCards(selectedSetCount)
+    }
 
     LaunchedEffect(saveMessage) {
         saveMessage?.let {
@@ -80,7 +89,10 @@ fun FortuneScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = { selectedSetCount = 5 },
+                onClick = {
+                    selectedSetCount = 5
+                    viewModel.updatePendingSetCount(5)
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedSetCount == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
@@ -90,7 +102,10 @@ fun FortuneScreen(
                 Text(text = "5개 조합", fontWeight = FontWeight.Bold)
             }
             Button(
-                onClick = { selectedSetCount = 10 },
+                onClick = {
+                    selectedSetCount = 10
+                    viewModel.updatePendingSetCount(10)
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selectedSetCount == 10) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
                 ),
@@ -99,6 +114,17 @@ fun FortuneScreen(
             ) {
                 Text(text = "10개 조합", fontWeight = FontWeight.Bold)
             }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Button(
+            onClick = { viewModel.drawTarotCards(selectedSetCount) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(text = "카드 다시 뽑기", fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -112,14 +138,17 @@ fun FortuneScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // 3장의 카드 - 선택한 카드만 색이 바뀌고, 다른 카드를 누르면 언제든 다시 바뀐다
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            for (i in 1..3) {
-                CardBackItem(cardIndex = i) {
-                    viewModel.selectTarotCard(selectedSetCount)
-                }
+            tarotCardOptions.forEachIndexed { index, _ ->
+                CardBackItem(
+                    cardIndex = index + 1,
+                    isSelected = selectedCardIndex == index,
+                    onClick = { viewModel.selectTarotCard(index) }
+                )
             }
         }
 
@@ -160,8 +189,39 @@ fun FortuneScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 긍정(정방향) 풀이
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = "🌞 긍정  ",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = tarotMeaningPositive ?: "",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(text = tarotMeaning ?: "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+
+                            // 부정(역방향) 풀이
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = "🌧️ 주의  ",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFC62828),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = tarotMeaningNegative ?: "",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
                 }
@@ -212,27 +272,37 @@ fun FortuneScreen(
     }
 }
 
+/**
+ * 카드 뒷면 컴포넌트.
+ * isSelected가 true인 카드만 골드색으로 하이라이트되고, 나머지는 기본 보라색을 유지한다.
+ * 재선택이 자유롭기 때문에 클릭 제한을 걸지 않는다 - 언제든 다른 카드를 눌러 선택을 바꿀 수 있음.
+ */
 @Composable
-fun CardBackItem(cardIndex: Int, onClick: () -> Unit) {
+fun CardBackItem(cardIndex: Int, isSelected: Boolean, onClick: () -> Unit) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFFFFD700) else Color(0xFF512DA8),
+        label = "cardBackColor"
+    )
+
     Box(
         modifier = Modifier
             .size(width = 95.dp, height = 135.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF512DA8))
+            .background(backgroundColor)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "TAROT",
-                color = Color(0xFFFFD700),
+                color = if (isSelected) Color(0xFF3E2723) else Color(0xFFFFD700),
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "카드 $cardIndex",
-                color = Color.White,
+                color = if (isSelected) Color(0xFF3E2723) else Color.White,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp
             )
