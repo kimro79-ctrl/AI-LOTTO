@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import java.util.Calendar
+import java.util.TimeZone
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -112,6 +114,10 @@ class AnalysisViewModel @Inject constructor(
     private val _latestWinNumbers = MutableStateFlow(listOf(6, 7, 11, 15, 39, 43))
     val latestWinNumbers: StateFlow<List<Int>> = _latestWinNumbers.asStateFlow()
 
+    // 실제로 조회에 성공한 회차 번호. 화면 상단 배너의 "OOOO회 당첨 번호" 표시에 사용된다.
+    private val _latestRound = MutableStateFlow<Int?>(null)
+    val latestRound: StateFlow<Int?> = _latestRound.asStateFlow()
+
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
@@ -126,28 +132,59 @@ class AnalysisViewModel @Inject constructor(
     private fun fetchLatestLottoNumber() {
         viewModelScope.launch {
             try {
-                val targetRound = 1235
-                val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$targetRound"
-                val responseJson = withContext(Dispatchers.IO) {
-                    URL(urlString).readText()
-                }
+                var round = estimateLatestRound()
+                var attemptsLeft = 3 // 혹시 이번 주 추첨이 아직 발표 전이면 한 회차씩 낮춰서 최대 3번 재시도
 
-                val jsonObject = JSONObject(responseJson as String)
-                if (jsonObject.getString("returnValue") == "success") {
-                    val nums = listOf(
-                        jsonObject.getInt("drwtNo1"),
-                        jsonObject.getInt("drwtNo2"),
-                        jsonObject.getInt("drwtNo3"),
-                        jsonObject.getInt("drwtNo4"),
-                        jsonObject.getInt("drwtNo5"),
-                        jsonObject.getInt("drwtNo6")
-                    )
-                    _latestWinNumbers.value = nums
+                while (attemptsLeft > 0) {
+                    val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round"
+                    val responseJson = withContext(Dispatchers.IO) {
+                        URL(urlString).readText()
+                    }
+
+                    val jsonObject = JSONObject(responseJson)
+                    if (jsonObject.getString("returnValue") == "success") {
+                        val nums = listOf(
+                            jsonObject.getInt("drwtNo1"),
+                            jsonObject.getInt("drwtNo2"),
+                            jsonObject.getInt("drwtNo3"),
+                            jsonObject.getInt("drwtNo4"),
+                            jsonObject.getInt("drwtNo5"),
+                            jsonObject.getInt("drwtNo6")
+                        )
+                        _latestWinNumbers.value = nums
+                        _latestRound.value = round
+                        break
+                    } else {
+                        // 아직 발표되지 않은 회차 -> 한 회차 낮춰서 다시 시도
+                        round -= 1
+                        attemptsLeft -= 1
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    /**
+     * 로또 1회차 추첨일(2002-12-07, 매주 토요일 추첨)을 기준으로
+     * 오늘 날짜까지 몇 주가 지났는지 계산해서 "현재 최신 회차"를 추정한다.
+     * 실제 발표 여부는 fetchLatestLottoNumber에서 API 응답으로 재확인하고,
+     * 아직 발표 전이면 한 회차씩 낮춰가며 보정한다.
+     */
+    private fun estimateLatestRound(): Int {
+        val seoulTimeZone = TimeZone.getTimeZone("Asia/Seoul")
+
+        val baseCalendar = Calendar.getInstance(seoulTimeZone).apply {
+            set(2002, Calendar.DECEMBER, 7, 12, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val nowCalendar = Calendar.getInstance(seoulTimeZone)
+
+        val diffMillis = nowCalendar.timeInMillis - baseCalendar.timeInMillis
+        val diffWeeks = (diffMillis / (7L * 24 * 60 * 60 * 1000)).toInt()
+
+        return (diffWeeks + 1).coerceAtLeast(1)
     }
 
     fun generateSmartNumbers(setCount: Int) {
