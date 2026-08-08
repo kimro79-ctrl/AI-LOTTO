@@ -1,3 +1,4 @@
+// File Path: app/src/main/java/com/kimro/ai/lotto/data/repository/LottoRepositoryImpl.kt
 package com.kimro.ai.lotto.data.repository
 
 import com.kimro.ai.lotto.data.local.LottoDao
@@ -16,7 +17,7 @@ class LottoRepositoryImpl @Inject constructor(
         return lottoDao.getAllHistory()
     }
 
-    override suspend fun insertLotto(numbers: List<Int>, type: String) {
+    override suspend fun insertLotto(numbers: List<Int>, type: String, round: Int) {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val dateString = dateFormat.format(Date())
         val numbersString = numbers.joinToString(",")
@@ -24,7 +25,8 @@ class LottoRepositoryImpl @Inject constructor(
         val entity = LottoEntity(
             numbers = numbersString,
             type = type,
-            date = dateString
+            date = dateString,
+            round = round
         )
         lottoDao.insertLotto(entity)
     }
