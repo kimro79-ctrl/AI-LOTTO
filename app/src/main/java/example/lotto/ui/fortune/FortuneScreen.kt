@@ -275,7 +275,6 @@ fun FortuneScreen(
 }
 
 /**
-/**
  * 카드 뒷면 컴포넌트.
  * isSelected가 true인 카드만 골드색으로 하이라이트된다.
  * isLocked가 true(이미 한 장을 선택한 상태)이면 클릭이 아예 먹히지 않는다.
