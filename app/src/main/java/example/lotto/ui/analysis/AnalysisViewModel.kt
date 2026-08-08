@@ -17,6 +17,86 @@ import java.net.URL
 import javax.inject.Inject
 import kotlin.random.Random
 
+/**
+ * 생성된 번호 조합 1개에 대한 통계 분석 결과.
+ * 화면에서 "전문 분석 리포트"처럼 보여주기 위한 지표들을 담는다.
+ */
+data class LottoSetAnalysis(
+    val oddCount: Int,
+    val evenCount: Int,
+    val lowCount: Int,      // 1~22
+    val highCount: Int,     // 23~45
+    val hasConsecutive: Boolean,
+    val hasTooManySameEndDigits: Boolean,
+    val sum: Int,
+    val isSumInNormalRange: Boolean,   // 100~175: 역대 당첨번호 총합의 대다수가 속하는 구간
+    val carryOverNumbers: List<Int>,   // 직전 회차 당첨번호와 겹치는 번호(이월수)
+    val occupiedDecadeBins: Int,       // 1-10 / 11-20 / 21-30 / 31-40 / 41-45 중 몇 구간에 분포되어 있는지 (최대 5)
+    val score: Int                     // 0~100 종합 점수
+)
+
+/**
+ * 번호 조합 하나를 통계적으로 분석해서 점수까지 계산한다.
+ * 실시간 DB 조회 없이 조합 자체의 패턴만으로 계산 가능한 지표들로 구성했다.
+ */
+fun analyzeLottoSet(numbers: List<Int>, latestWinNumbers: List<Int>): LottoSetAnalysis {
+    val sorted = numbers.sorted()
+
+    val oddCount = sorted.count { it % 2 != 0 }
+    val evenCount = sorted.size - oddCount
+
+    val lowCount = sorted.count { it in 1..22 }
+    val highCount = sorted.size - lowCount
+
+    var hasConsecutive = false
+    for (i in 0 until sorted.size - 1) {
+        if (sorted[i + 1] - sorted[i] == 1) {
+            hasConsecutive = true
+            break
+        }
+    }
+
+    val endDigits = sorted.map { it % 10 }
+    val hasTooManySameEndDigits = endDigits.groupBy { it }.any { it.value.size >= 3 }
+
+    val sum = sorted.sum()
+    val isSumInNormalRange = sum in 100..175
+
+    val carryOverNumbers = sorted.filter { it in latestWinNumbers }
+
+    val decadeBins = sorted.map { (it - 1) / 10 }.distinct().size
+
+    var score = 0
+    score += when (oddCount) {
+        3 -> 25
+        2, 4 -> 15
+        else -> 5
+    }
+    score += when (lowCount) {
+        3 -> 25
+        2, 4 -> 15
+        else -> 5
+    }
+    score += if (!hasConsecutive) 20 else 5
+    score += if (!hasTooManySameEndDigits) 20 else 10
+    score += if (isSumInNormalRange) 10 else 5
+    score += if (decadeBins >= 4) 5 else 0
+
+    return LottoSetAnalysis(
+        oddCount = oddCount,
+        evenCount = evenCount,
+        lowCount = lowCount,
+        highCount = highCount,
+        hasConsecutive = hasConsecutive,
+        hasTooManySameEndDigits = hasTooManySameEndDigits,
+        sum = sum,
+        isSumInNormalRange = isSumInNormalRange,
+        carryOverNumbers = carryOverNumbers,
+        occupiedDecadeBins = decadeBins,
+        score = score.coerceAtMost(100)
+    )
+}
+
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
     application: Application,
