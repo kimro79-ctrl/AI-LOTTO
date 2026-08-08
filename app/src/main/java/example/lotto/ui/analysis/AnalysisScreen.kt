@@ -128,11 +128,21 @@ fun AnalysisScreen(
                     }
                 }
 
+                item {
+                    Text(
+                        text = "카드를 탭하면 조합별 통계 분석 리포트를 볼 수 있어요",
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
                 itemsIndexed(numberSets) { index, set ->
                     LottoSetCard(
                         setIndex = index + 1,
                         numbers = set,
-                        latestWinNumbers = latestWinNumbers
+                        latestWinNumbers = latestWinNumbers,
+                        initiallyExpanded = index == 0
                     )
                 }
             }
@@ -370,9 +380,10 @@ fun ConditionChangeBanner(
 fun LottoSetCard(
     setIndex: Int,
     numbers: List<Int>,
-    latestWinNumbers: List<Int>
+    latestWinNumbers: List<Int>,
+    initiallyExpanded: Boolean = false
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
     val analysis = remember(numbers, latestWinNumbers) {
         analyzeLottoSet(numbers, latestWinNumbers)
     }
@@ -385,9 +396,7 @@ fun LottoSetCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -404,14 +413,35 @@ fun LottoSetCard(
                     numbers.forEach { number ->
                         LottoBall(number = number, size = 32)
                     }
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) "분석 접기" else "분석 펼치기",
-                        tint = Color(0xFF94A3B8),
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 탭 가능한 영역임을 명확히 알려주는 라벨 + 화살표 (배경색으로 버튼처럼 보이게)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF8FAFC))
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = if (expanded) "상세 분석 접기" else "상세 분석 보기",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0EA5E9)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "분석 접기" else "분석 펼치기",
+                    tint = Color(0xFF0EA5E9),
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
             if (expanded) {
