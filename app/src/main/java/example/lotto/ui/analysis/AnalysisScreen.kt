@@ -11,8 +11,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -97,7 +100,7 @@ fun AnalysisScreen(
                 )
             }
 
-            // 4. 생성된 번호 조합 리스트 (카드 섹션)
+            // 4. 생성된 번호 조합 리스트 (카드 섹션) - 카드마다 펼쳐서 상세 분석을 볼 수 있음
             if (numberSets.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -126,7 +129,11 @@ fun AnalysisScreen(
                 }
 
                 itemsIndexed(numberSets) { index, set ->
-                    LottoSetCard(setIndex = index + 1, numbers = set)
+                    LottoSetCard(
+                        setIndex = index + 1,
+                        numbers = set,
+                        latestWinNumbers = latestWinNumbers
+                    )
                 }
             }
         }
@@ -356,34 +363,248 @@ fun ConditionChangeBanner(
     }
 }
 
+/**
+ * 조합 1개를 보여주는 카드. 우측 화살표를 누르면 통계 분석 리포트가 펼쳐진다.
+ */
 @Composable
-fun LottoSetCard(setIndex: Int, numbers: List<Int>) {
+fun LottoSetCard(
+    setIndex: Int,
+    numbers: List<Int>,
+    latestWinNumbers: List<Int>
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val analysis = remember(numbers, latestWinNumbers) {
+        analyzeLottoSet(numbers, latestWinNumbers)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "${setIndex}세트",
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF64748B),
-                fontSize = 13.sp
-            )
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                numbers.forEach { number ->
-                    LottoBall(number = number, size = 32)
+                Text(
+                    text = "${setIndex}세트",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B),
+                    fontSize = 13.sp
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    numbers.forEach { number ->
+                        LottoBall(number = number, size = 32)
+                    }
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (expanded) "분석 접기" else "분석 펼치기",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(modifier = Modifier.height(12.dp))
+                AnalysisReportSection(analysis)
+            }
+        }
+    }
+}
+
+/**
+ * 펼쳤을 때 보여줄 통계 분석 리포트.
+ * 홀짝/고저 비율 게이지, 연속번호·끝수중복 여부, 총합, 이월수, 구간 분포, 종합 점수를 표시한다.
+ */
+@Composable
+fun AnalysisReportSection(analysis: LottoSetAnalysis) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+        // 종합 점수 배지
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "통계 분석 리포트",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+            val scoreColor = when {
+                analysis.score >= 85 -> Color(0xFF10B981)
+                analysis.score >= 65 -> Color(0xFF0EA5E9)
+                else -> Color(0xFFF59E0B)
+            }
+            Surface(
+                color = scoreColor.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    text = "분석 점수 ${analysis.score}점",
+                    color = scoreColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
+
+        // 홀짝 비율 게이지
+        RatioGaugeRow(
+            label = "홀짝 비율",
+            leftLabel = "홀 ${analysis.oddCount}",
+            rightLabel = "짝 ${analysis.evenCount}",
+            leftValue = analysis.oddCount,
+            total = 6,
+            barColor = Color(0xFF3B82F6)
+        )
+
+        // 고저 비율 게이지
+        RatioGaugeRow(
+            label = "고저 비율",
+            leftLabel = "저 ${analysis.lowCount}",
+            rightLabel = "고 ${analysis.highCount}",
+            leftValue = analysis.lowCount,
+            total = 6,
+            barColor = Color(0xFFF59E0B)
+        )
+
+        // 체크 리스트형 지표들
+        AnalysisCheckRow(
+            label = "연속번호",
+            passed = !analysis.hasConsecutive,
+            passedText = "연속번호 없음",
+            failedText = "연속번호 포함"
+        )
+        AnalysisCheckRow(
+            label = "끝수 분산",
+            passed = !analysis.hasTooManySameEndDigits,
+            passedText = "끝수 중복 없음",
+            failedText = "동일 끝수 3개 이상"
+        )
+        AnalysisCheckRow(
+            label = "총합 (${analysis.sum})",
+            passed = analysis.isSumInNormalRange,
+            passedText = "적정 구간(100~175)",
+            failedText = "통계적 적정 구간 벗어남"
+        )
+
+        // 이월수 / 구간 분포 정보
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            InfoChip(
+                modifier = Modifier.weight(1f),
+                title = "이월수",
+                value = if (analysis.carryOverNumbers.isEmpty()) "없음"
+                        else analysis.carryOverNumbers.joinToString(", ")
+            )
+            InfoChip(
+                modifier = Modifier.weight(1f),
+                title = "구간 분포",
+                value = "${analysis.occupiedDecadeBins} / 5구간"
+            )
+        }
+    }
+}
+
+@Composable
+fun RatioGaugeRow(
+    label: String,
+    leftLabel: String,
+    rightLabel: String,
+    leftValue: Int,
+    total: Int,
+    barColor: Color
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = label, fontSize = 11.sp, color = Color(0xFF64748B))
+            Text(
+                text = "$leftLabel : $rightLabel",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF334155)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { leftValue.toFloat() / total.toFloat() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = barColor,
+            trackColor = Color(0xFFE2E8F0)
+        )
+    }
+}
+
+@Composable
+fun AnalysisCheckRow(
+    label: String,
+    passed: Boolean,
+    passedText: String,
+    failedText: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, fontSize = 12.sp, color = Color(0xFF64748B))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (passed) Icons.Default.Check else Icons.Default.Warning,
+                contentDescription = null,
+                tint = if (passed) Color(0xFF10B981) else Color(0xFFF59E0B),
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = if (passed) passedText else failedText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (passed) Color(0xFF10B981) else Color(0xFFF59E0B)
+            )
+        }
+    }
+}
+
+@Composable
+fun InfoChip(modifier: Modifier = Modifier, title: String, value: String) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xFFF8FAFC),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(text = title, fontSize = 10.sp, color = Color(0xFF94A3B8))
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF334155)
+            )
         }
     }
 }
