@@ -24,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -144,10 +145,14 @@ fun HistoryItem(
     val typeLabel = when (entity.type) {
         "ANALYSIS" -> "스마트 분석"
         "FORTUNE" -> "운세 추천"
-        else -> "QR 스캔"
+        "QR" -> "QR 스캔"
+        else -> "기타"
     }
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+
+    // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
+    val hasRound = entity.round > 0
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -163,12 +168,29 @@ fun HistoryItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "[$typeLabel] ${entity.date}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    fontSize = 12.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "[$typeLabel] ${entity.date}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                    if (hasRound) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = Color(0xFF7C3AED).copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "${entity.round}회차",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 IconButton(
                     onClick = onDeleteClick,
                     modifier = Modifier.size(28.dp)
