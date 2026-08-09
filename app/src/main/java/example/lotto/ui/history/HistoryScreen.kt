@@ -2,6 +2,7 @@
 package com.kimro.ai.lotto.ui.history
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width // <-- 이 임포트가 빠져서 빌드가 실패했던 것입니다.
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,24 +43,57 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kimro.ai.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.ui.analysis.analyzeLottoSet
+
+// 필터 옵션. "저장 시 type 문자열"을 하나 이상 매핑해서 여러 타입을 하나로 묶을 수 있게 했다.
+// (예: 타로 화면은 "TAROT", 예전 코드는 "FORTUNE"으로 저장한 이력이 섞여있어도 "운세"로 함께 묶임)
+private enum class HistoryFilter(val label: String, val matchTypes: Set<String>?) {
+    ALL("전체", null),
+    ANALYSIS("스마트 분석", setOf("ANALYSIS")),
+    FORTUNE("운세", setOf("FORTUNE", "TAROT")),
+    QR("QR 스캔", setOf("QR"))
+}
+
+private enum class HistorySort(val label: String) {
+    LATEST("최신순"),
+    SCORE("균형도 점수순")
+}
 
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val historyList by viewModel.historyList.collectAsState()
-    
+
     var showClearAllDialog by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
+    var selectedSort by remember { mutableStateOf(HistorySort.LATEST) }
+
+    // 필터링 + 정렬된 최종 리스트 계산
+    val displayedList = remember(historyList, selectedFilter, selectedSort) {
+        val filtered = when (selectedFilter) {
+            HistoryFilter.ALL -> historyList
+            else -> historyList.filter { it.type in (selectedFilter.matchTypes ?: emptySet()) }
+        }
+        when (selectedSort) {
+            HistorySort.LATEST -> filtered // DB에서 이미 최신순(id desc)으로 내려옴
+            HistorySort.SCORE -> filtered.sortedByDescending { entity ->
+                val numbers = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+                if (numbers.size == 6) analyzeLottoSet(numbers).score else -1
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // 상단 타이틀 및 전체 삭제 버튼 영역
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -84,6 +118,54 @@ fun HistoryScreen(
             }
         }
 
+        if (historyList.isNotEmpty()) {
+            // 타입별 필터 칩
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                items(HistoryFilter.values().toList()) { filter ->
+                    val isSelected = selectedFilter == filter
+                    Surface(
+                        color = if (isSelected) Color(0xFF7C3AED) else Color(0xFFF1F5F9),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.clickable { selectedFilter = filter }
+                    ) {
+                        Text(
+                            text = filter.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White else Color(0xFF64748B),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        )
+                    }
+                }
+            }
+
+            // 정렬 옵션 칩
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                HistorySort.values().forEach { sort ->
+                    val isSelected = selectedSort == sort
+                    Surface(
+                        color = if (isSelected) Color(0xFFE0F2FE) else Color.Transparent,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.clickable { selectedSort = sort }
+                    ) {
+                        Text(
+                            text = if (isSelected) "✓ ${sort.label}" else sort.label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color(0xFF0284C7) else Color(0xFF94A3B8),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         if (historyList.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -95,12 +177,23 @@ fun HistoryScreen(
                     fontSize = 16.sp
                 )
             }
+        } else if (displayedList.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "'${selectedFilter.label}' 항목이 없습니다.",
+                    color = Color.Gray,
+                    fontSize = 15.sp
+                )
+            }
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
-                    items = historyList,
+                    items = displayedList,
                     key = { item -> item.id }
                 ) { item ->
                     HistoryItem(
@@ -141,12 +234,14 @@ fun HistoryItem(
 ) {
     val typeLabel = when (entity.type) {
         "ANALYSIS" -> "스마트 분석"
-        "FORTUNE" -> "운세 추천"
+        "FORTUNE", "TAROT" -> "운세 추천"
         "QR" -> "QR 스캔"
         else -> "기타"
     }
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+
+    // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
     val hasRound = entity.round > 0
 
     Card(
