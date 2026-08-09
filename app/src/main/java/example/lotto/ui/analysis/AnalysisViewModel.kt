@@ -166,6 +166,14 @@ class AnalysisViewModel @Inject constructor(
                                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                             )
                             connection.setRequestProperty("Accept", "application/json, text/plain, */*")
+                            // Referer가 없으면 동행복권 서버가 이 요청을 정상 페이지 요청이 아니라고 판단해
+                            // 홈페이지로 리다이렉트시켜버림(그 결과 HTML을 받게 되어 JSON 파싱이 실패했었음).
+                            // 실제로 이 API를 호출하는 당첨결과 페이지 주소를 Referer로 넣어 우회한다.
+                            connection.setRequestProperty(
+                                "Referer",
+                                "https://www.dhlottery.co.kr/gameResult.do?method=byWin"
+                            )
+                            connection.instanceFollowRedirects = true
                             connection.inputStream.bufferedReader().use { it.readText() }
                         } finally {
                             connection.disconnect()
