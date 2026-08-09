@@ -703,6 +703,12 @@ private fun manualBallColor(number: Int): Color = when (number) {
 }
 
 
+/**
+ * 조합 1개를 보여주는 카드. 우측 화살표를 누르면 통계 분석 리포트가 펼쳐진다.
+ */
+@Composable
+fun LottoSetCard(
+    setIndex: Int,
     numbers: List<Int>,
     latestWinNumbers: List<Int>,
     initiallyExpanded: Boolean = false,
