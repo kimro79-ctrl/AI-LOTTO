@@ -7,10 +7,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
@@ -27,6 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,10 +44,12 @@ fun AnalysisScreen(
     val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
     val latestRound by viewModel.latestRound.collectAsState()
     val latestRoundFetchFailed by viewModel.latestRoundFetchFailed.collectAsState()
+    val lastFetchErrorDebug by viewModel.lastFetchErrorDebug.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
     var showLogicInfoDialog by remember { mutableStateOf(false) }
+    var showManualPickDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
 
     LaunchedEffect(saveMessage) {
@@ -83,6 +90,7 @@ fun AnalysisScreen(
                     winNumbers = latestWinNumbers,
                     round = latestRound,
                     fetchFailed = latestRoundFetchFailed,
+                    errorDebugMessage = lastFetchErrorDebug,
                     onRetryClick = { viewModel.retryFetchLatestLottoNumber() }
                 )
             }
@@ -134,12 +142,25 @@ fun AnalysisScreen(
                 }
             }
 
-            // 3-2. 직접 번호 선택 (로또 용지 스타일)
+            // 3-2. 직접 번호 선택 (버튼을 누르면 팝업으로 로또 용지 그리드가 뜬다)
             item {
-                ManualPickSection(
-                    latestWinNumbers = latestWinNumbers,
-                    onSaveClick = { numbers -> viewModel.saveSingleSet(numbers) }
-                )
+                OutlinedButton(
+                    onClick = { showManualPickDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = Brush.horizontalGradient(listOf(Color(0xFF0D9488), Color(0xFF0D9488)))
+                    )
+                ) {
+                    Text(
+                        text = "🎫  번호 직접 선택하기",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0D9488)
+                    )
+                }
             }
 
             // 4. 생성된 번호 조합 리스트 (카드 섹션) - 카드마다 펼쳐서 상세 분석을 볼 수 있음
@@ -205,6 +226,14 @@ fun AnalysisScreen(
 
     if (showLogicInfoDialog) {
         LogicInfoDialog(onDismiss = { showLogicInfoDialog = false })
+    }
+
+    if (showManualPickDialog) {
+        ManualPickDialog(
+            latestWinNumbers = latestWinNumbers,
+            onSaveClick = { numbers -> viewModel.saveSingleSet(numbers) },
+            onDismiss = { showManualPickDialog = false }
+        )
     }
 }
 
@@ -280,6 +309,7 @@ fun LatestWinBanner(
     winNumbers: List<Int>,
     round: Int?,
     fetchFailed: Boolean = false,
+    errorDebugMessage: String? = null,
     onRetryClick: () -> Unit = {}
 ) {
     Card(
@@ -327,6 +357,15 @@ fun LatestWinBanner(
                             )
                         }
                     }
+                }
+                if (fetchFailed && !errorDebugMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = errorDebugMessage,
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -529,14 +568,15 @@ fun ConditionChangeBanner(
 }
 
 /**
- * 로또 용지처럼 1~45 번호를 직접 눌러서 6개를 고르는 섹션.
+ * 로또 용지처럼 1~45 번호를 직접 눌러서 6개를 고르는 팝업.
  * 6개가 다 채워지면 AI 추천 조합과 완전히 동일한 통계 분석 리포트를 보여주고,
  * 마음에 들면 개별 저장할 수 있다.
  */
 @Composable
-fun ManualPickSection(
+fun ManualPickDialog(
     latestWinNumbers: List<Int>,
-    onSaveClick: (List<Int>) -> Unit
+    onSaveClick: (List<Int>) -> Unit,
+    onDismiss: () -> Unit
 ) {
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
@@ -553,141 +593,170 @@ fun ManualPickSection(
         if (isComplete) analyzeLottoSet(sortedSelected, latestWinNumbers) else null
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "번호 직접 선택하기",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A)
-                )
-                Surface(
-                    color = if (isComplete) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFFF1F5F9),
-                    shape = RoundedCornerShape(10.dp)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
+                .padding(horizontal = 12.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 상단 헤더 (제목 + 진행 개수 + 닫기 버튼)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${sortedSelected.size} / 6",
-                        fontSize = 12.sp,
+                        text = "번호 직접 선택하기",
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isComplete) Color(0xFF10B981) else Color(0xFF64748B),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        color = Color(0xFF0F172A)
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = if (isComplete) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "${sortedSelected.size} / 6",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isComplete) Color(0xFF10B981) else Color(0xFF64748B),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "닫기",
+                                tint = Color(0xFF94A3B8)
+                            )
+                        }
+                    }
                 }
-            }
+                HorizontalDivider(color = Color(0xFFF1F5F9))
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "로또 용지처럼 원하는 번호 6개를 직접 눌러 선택해보세요",
-                fontSize = 12.sp,
-                color = Color(0xFF64748B)
-            )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "로또 용지처럼 원하는 번호 6개를 직접 눌러 선택해보세요",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-            // 1~45 번호 그리드 (9열 x 5행)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                (1..45).chunked(9).forEach { rowNumbers ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        rowNumbers.forEach { number ->
-                            val isSelected = number in selectedNumbers
-                            val canSelectMore = selectedNumbers.size < 6
+                    // 1~45 번호 그리드 (9열 x 5행)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        (1..45).chunked(9).forEach { rowNumbers ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                rowNumbers.forEach { number ->
+                                    val isSelected = number in selectedNumbers
+                                    val canSelectMore = selectedNumbers.size < 6
 
-                            Box(
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isSelected -> manualBallColor(number)
+                                                    else -> Color(0xFFF1F5F9)
+                                                }
+                                            )
+                                            .clickable(enabled = isSelected || canSelectMore) {
+                                                selectedNumbers = if (isSelected) {
+                                                    selectedNumbers - number
+                                                } else {
+                                                    selectedNumbers + number
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = number.toString(),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (sortedSelected.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            sortedSelected.forEach { number ->
+                                LottoBall(number = number, size = 30)
+                            }
+                        }
+                    }
+
+                    if (isComplete && analysis != null) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        AnalysisReportSection(analysis)
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedButton(
+                                onClick = { selectedNumbers = emptySet() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("다시 선택", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = {
+                                    onSaveClick(sortedSelected)
+                                    saved = true
+                                },
+                                enabled = !saved,
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isSelected -> manualBallColor(number)
-                                            else -> Color(0xFFF1F5F9)
-                                        }
-                                    )
-                                    .clickable(enabled = isSelected || canSelectMore) {
-                                        selectedNumbers = if (isSelected) {
-                                            selectedNumbers - number
-                                        } else {
-                                            selectedNumbers + number
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
+                                    .weight(1f)
+                                    .height(42.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (saved) Color(0xFFE2E8F0) else Color(0xFF10B981),
+                                    disabledContainerColor = Color(0xFFE2E8F0)
+                                )
                             ) {
                                 Text(
-                                    text = number.toString(),
-                                    fontSize = 11.sp,
+                                    text = if (saved) "저장됨" else "이 조합 저장하기",
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                    color = if (saved) Color(0xFF64748B) else Color.White
                                 )
                             }
                         }
                     }
-                }
-            }
 
-            if (sortedSelected.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    sortedSelected.forEach { number ->
-                        LottoBall(number = number, size = 30)
-                    }
-                }
-            }
-
-            if (isComplete && analysis != null) {
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color(0xFFF1F5F9))
-                Spacer(modifier = Modifier.height(14.dp))
-                AnalysisReportSection(analysis)
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedButton(
-                        onClick = { selectedNumbers = emptySet() },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("다시 선택", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Button(
-                        onClick = {
-                            onSaveClick(sortedSelected)
-                            saved = true
-                        },
-                        enabled = !saved,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(42.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (saved) Color(0xFFE2E8F0) else Color(0xFF10B981),
-                            disabledContainerColor = Color(0xFFE2E8F0)
-                        )
-                    ) {
-                        Text(
-                            text = if (saved) "저장됨" else "이 조합 저장하기",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (saved) Color(0xFF64748B) else Color.White
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
