@@ -2,21 +2,15 @@
 package com.kimro.ai.lotto.ui.analysis
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kimro.ai.lotto.data.repository.LottoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.Calendar
-import java.util.TimeZone
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -33,16 +27,15 @@ data class LottoSetAnalysis(
     val hasTooManySameEndDigits: Boolean,
     val sum: Int,
     val isSumInNormalRange: Boolean,   // 100~175: 역대 당첨번호 총합의 대다수가 속하는 구간
-    val carryOverNumbers: List<Int>,   // 직전 회차 당첨번호와 겹치는 번호(이월수)
     val occupiedDecadeBins: Int,       // 1-10 / 11-20 / 21-30 / 31-40 / 41-45 중 몇 구간에 분포되어 있는지 (최대 5)
     val score: Int                     // 0~100 종합 점수
 )
 
 /**
  * 번호 조합 하나를 통계적으로 분석해서 점수까지 계산한다.
- * 실시간 DB 조회 없이 조합 자체의 패턴만으로 계산 가능한 지표들로 구성했다.
+ * 외부 데이터(실제 당첨번호) 없이, 조합 자체의 패턴만으로 계산 가능한 지표들로만 구성했다.
  */
-fun analyzeLottoSet(numbers: List<Int>, latestWinNumbers: List<Int>): LottoSetAnalysis {
+fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
     val sorted = numbers.sorted()
 
     val oddCount = sorted.count { it % 2 != 0 }
@@ -64,8 +57,6 @@ fun analyzeLottoSet(numbers: List<Int>, latestWinNumbers: List<Int>): LottoSetAn
 
     val sum = sorted.sum()
     val isSumInNormalRange = sum in 100..175
-
-    val carryOverNumbers = sorted.filter { it in latestWinNumbers }
 
     val decadeBins = sorted.map { (it - 1) / 10 }.distinct().size
 
@@ -94,7 +85,6 @@ fun analyzeLottoSet(numbers: List<Int>, latestWinNumbers: List<Int>): LottoSetAn
         hasTooManySameEndDigits = hasTooManySameEndDigits,
         sum = sum,
         isSumInNormalRange = isSumInNormalRange,
-        carryOverNumbers = carryOverNumbers,
         occupiedDecadeBins = decadeBins,
         score = score.coerceAtMost(100)
     )
@@ -112,166 +102,91 @@ class AnalysisViewModel @Inject constructor(
     private val _selectedCondition = MutableStateFlow("고도화 종합 분석 (7대 로직 적용)")
     val selectedCondition: StateFlow<String> = _selectedCondition.asStateFlow()
 
-    private val _latestWinNumbers = MutableStateFlow(listOf(6, 7, 11, 15, 39, 43))
-    val latestWinNumbers: StateFlow<List<Int>> = _latestWinNumbers.asStateFlow()
-
-    // 실제로 조회에 성공한 회차 번호. 화면 상단 배너의 "OOOO회 당첨 번호" 표시에 사용된다.
-    private val _latestRound = MutableStateFlow<Int?>(null)
-    val latestRound: StateFlow<Int?> = _latestRound.asStateFlow()
-
-    // 여러 번 재시도해도 최신 회차를 못 가져온 경우 true. 화면에서 "불러오는 중" 대신 실패 안내로 전환하는 데 쓴다.
-    private val _latestRoundFetchFailed = MutableStateFlow(false)
-    val latestRoundFetchFailed: StateFlow<Boolean> = _latestRoundFetchFailed.asStateFlow()
-
-    // 실패했을 때 실제로 무슨 예외가 발생했는지(네트워크 오류/파싱 오류 등) 화면에서 바로 확인하기 위한 디버그용 메시지
-    private val _lastFetchErrorDebug = MutableStateFlow<String?>(null)
-    val lastFetchErrorDebug: StateFlow<String?> = _lastFetchErrorDebug.asStateFlow()
-
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
-    init {
-        fetchLatestLottoNumber()
+    // 즐겨찾는 번호(항상 포함) / 기피 번호(항상 제외) 설정을 앱을 껐다 켜도 유지하기 위해 SharedPreferences에 저장한다.
+    private val prefs = application.getSharedPreferences("lotto_number_prefs", Context.MODE_PRIVATE)
+
+    private val _favoriteNumbers = MutableStateFlow(loadNumberSet("favorite_numbers"))
+    val favoriteNumbers: StateFlow<Set<Int>> = _favoriteNumbers.asStateFlow()
+
+    private val _excludedNumbers = MutableStateFlow(loadNumberSet("excluded_numbers"))
+    val excludedNumbers: StateFlow<Set<Int>> = _excludedNumbers.asStateFlow()
+
+    private fun loadNumberSet(key: String): Set<Int> {
+        val raw = prefs.getString(key, "") ?: ""
+        if (raw.isBlank()) return emptySet()
+        return raw.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+    }
+
+    private fun saveNumberSet(key: String, numbers: Set<Int>) {
+        prefs.edit().putString(key, numbers.joinToString(",")).apply()
+    }
+
+    /** 번호를 즐겨찾기에 추가/제거한다. 즐겨찾기는 최대 6개까지만 허용(6개 조합 전부를 못 채우면 안 되므로). */
+    fun toggleFavoriteNumber(number: Int) {
+        val current = _favoriteNumbers.value
+        val newFavorites = if (number in current) {
+            current - number
+        } else {
+            if (current.size >= 6) return
+            current + number
+        }
+        _favoriteNumbers.value = newFavorites
+        saveNumberSet("favorite_numbers", newFavorites)
+
+        // 즐겨찾기로 지정하면 기피 목록에서는 자동으로 빠진다 (동시에 둘 다일 수 없음)
+        if (number in newFavorites && number in _excludedNumbers.value) {
+            val newExcluded = _excludedNumbers.value - number
+            _excludedNumbers.value = newExcluded
+            saveNumberSet("excluded_numbers", newExcluded)
+        }
+    }
+
+    /** 번호를 기피 목록에 추가/제거한다. */
+    fun toggleExcludedNumber(number: Int) {
+        val current = _excludedNumbers.value
+        val newExcluded = if (number in current) current - number else current + number
+        _excludedNumbers.value = newExcluded
+        saveNumberSet("excluded_numbers", newExcluded)
+
+        // 기피로 지정하면 즐겨찾기 목록에서는 자동으로 빠진다
+        if (number in newExcluded && number in _favoriteNumbers.value) {
+            val newFavorites = _favoriteNumbers.value - number
+            _favoriteNumbers.value = newFavorites
+            saveNumberSet("favorite_numbers", newFavorites)
+        }
     }
 
     fun setCondition(condition: String) {
         _selectedCondition.value = condition
     }
 
-    fun retryFetchLatestLottoNumber() {
-        fetchLatestLottoNumber()
-    }
-
-    private fun fetchLatestLottoNumber() {
-        _latestRoundFetchFailed.value = false
-        _lastFetchErrorDebug.value = null
-        viewModelScope.launch {
-            var round = estimateLatestRound()
-            var attemptsLeft = 15 // 추정 회차가 실제와 몇 회 차이나도 안전하게 찾아내도록 넉넉히 재시도
-            var succeeded = false
-            var lastError: String? = null
-
-            while (attemptsLeft > 0 && !succeeded) {
-                try {
-                    val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round"
-                    var debugResponseCode: Int? = null
-                    val responseJson = withContext(Dispatchers.IO) {
-                        val connection = URL(urlString).openConnection() as HttpURLConnection
-                        try {
-                            connection.requestMethod = "GET"
-                            connection.connectTimeout = 8000
-                            connection.readTimeout = 8000
-                            // User-Agent가 없으면 브라우저가 아닌 요청으로 판단해 HTML 차단 페이지를 돌려주는 경우가 있어 명시적으로 지정
-                            connection.setRequestProperty(
-                                "User-Agent",
-                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                            )
-                            connection.setRequestProperty("Accept", "application/json, text/plain, */*")
-                            // Referer가 없으면 동행복권 서버가 이 요청을 정상 페이지 요청이 아니라고 판단해
-                            // 홈페이지로 리다이렉트시켜버림(그 결과 HTML을 받게 되어 JSON 파싱이 실패했었음).
-                            // 실제로 이 API를 호출하는 당첨결과 페이지 주소를 Referer로 넣어 우회한다.
-                            connection.setRequestProperty(
-                                "Referer",
-                                "https://www.dhlottery.co.kr/gameResult.do?method=byWin"
-                            )
-                            connection.instanceFollowRedirects = true
-                            // "브라우저 주소창 직접 이동"과 "페이지 내 자바스크립트(AJAX) 호출"을
-                            // 이 헤더로 구분해서 전자만 차단(홈페이지로 리다이렉트)하는 경우가 많다.
-                            // 실제 결과 페이지의 JS가 보내는 것과 동일하게 이 헤더를 추가해 우회를 시도한다.
-                            connection.setRequestProperty("X-Requested-With", "XMLHttpRequest")
-                            debugResponseCode = connection.responseCode
-                            connection.inputStream.bufferedReader().use { it.readText() }
-                        } finally {
-                            connection.disconnect()
-                        }
-                    }
-
-                    try {
-                        val jsonObject = JSONObject(responseJson)
-                        if (jsonObject.getString("returnValue") == "success") {
-                            val nums = listOf(
-                                jsonObject.getInt("drwtNo1"),
-                                jsonObject.getInt("drwtNo2"),
-                                jsonObject.getInt("drwtNo3"),
-                                jsonObject.getInt("drwtNo4"),
-                                jsonObject.getInt("drwtNo5"),
-                                jsonObject.getInt("drwtNo6")
-                            )
-                            _latestWinNumbers.value = nums
-                            _latestRound.value = round
-                            succeeded = true
-                        } else {
-                            lastError = "회차 $round 응답(HTTP $debugResponseCode): returnValue=fail (해당 회차 미발표 또는 존재하지 않음)"
-                            round -= 1
-                            attemptsLeft -= 1
-                        }
-                    } catch (parseError: Exception) {
-                        val snippet = responseJson.take(80).replace("\n", " ")
-                        lastError = "회차 $round 응답(HTTP $debugResponseCode) JSON 파싱 실패: \"$snippet...\""
-                        round -= 1
-                        attemptsLeft -= 1
-                    }
-                } catch (e: Exception) {
-                    // 네트워크 오류 등 - 더 낮은 회차로도 재시도해보되, 무한정 돌지 않도록 시도 횟수는 소모한다
-                    lastError = "회차 $round 요청 중 예외: ${e.javaClass.simpleName} - ${e.message}"
-                    e.printStackTrace()
-                    round -= 1
-                    attemptsLeft -= 1
-                }
-            }
-
-            if (!succeeded) {
-                // 끝까지 실패하면 "불러오는 중..."에 무한정 머무르지 않도록 실패 상태를 명확히 표시한다
-                _latestRoundFetchFailed.value = true
-                _lastFetchErrorDebug.value = lastError
-            }
-        }
-    }
-
-    /**
-     * 로또 1회차 추첨일(2002-12-07, 매주 토요일 추첨)을 기준으로
-     * 오늘 날짜까지 몇 주가 지났는지 계산해서 "현재 최신 회차"를 추정한다.
-     * 실제 발표 여부는 fetchLatestLottoNumber에서 API 응답으로 재확인하고,
-     * 아직 발표 전이면 한 회차씩 낮춰가며 보정한다.
-     */
-    private fun estimateLatestRound(): Int {
-        val seoulTimeZone = TimeZone.getTimeZone("Asia/Seoul")
-
-        val baseCalendar = Calendar.getInstance(seoulTimeZone).apply {
-            set(2002, Calendar.DECEMBER, 7, 12, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val nowCalendar = Calendar.getInstance(seoulTimeZone)
-
-        val diffMillis = nowCalendar.timeInMillis - baseCalendar.timeInMillis
-        val diffWeeks = (diffMillis / (7L * 24 * 60 * 60 * 1000)).toInt()
-
-        return (diffWeeks + 1).coerceAtLeast(1)
-    }
-
     fun generateSmartNumbers(setCount: Int) {
         val generatedSets = mutableListOf<List<Int>>()
-        val latestWin = _latestWinNumbers.value
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        // 즐겨찾기와 기피 목록을 제외한 나머지 후보 번호 풀
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
 
         for (i in 0 until setCount) {
             var validSet = false
             var resultSet = mutableSetOf<Int>()
+            var attempts = 0
 
-            while (!validSet) {
+            // 즐겨찾기 번호가 홀짝/고저 조건과 충돌하면 무한루프에 빠질 수 있어 시도 횟수에 상한을 둔다.
+            while (!validSet && attempts < 500) {
+                attempts++
                 resultSet.clear()
+                resultSet.addAll(favorites) // 즐겨찾기 번호는 항상 포함
 
-                if (latestWin.isNotEmpty() && Random.nextBoolean()) {
-                    val carryOver = latestWin.random()
-                    resultSet.add(carryOver)
-                }
-
-                val recentExcluded = latestWin.toSet()
-                val candidatePool = (1..45).filter { it !in recentExcluded }
-
-                while (resultSet.size < 6) {
+                while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
                     val candidate = candidatePool.random()
                     resultSet.add(candidate)
                 }
+
+                if (resultSet.size < 6) break // 후보 풀이 부족한 극단적인 경우 - 있는 그대로 사용
 
                 val sortedList = resultSet.sorted()
 
