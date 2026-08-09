@@ -122,6 +122,10 @@ class AnalysisViewModel @Inject constructor(
     private val _latestRoundFetchFailed = MutableStateFlow(false)
     val latestRoundFetchFailed: StateFlow<Boolean> = _latestRoundFetchFailed.asStateFlow()
 
+    // 실패했을 때 실제로 무슨 예외가 발생했는지(네트워크 오류/파싱 오류 등) 화면에서 바로 확인하기 위한 디버그용 메시지
+    private val _lastFetchErrorDebug = MutableStateFlow<String?>(null)
+    val lastFetchErrorDebug: StateFlow<String?> = _lastFetchErrorDebug.asStateFlow()
+
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
@@ -139,10 +143,12 @@ class AnalysisViewModel @Inject constructor(
 
     private fun fetchLatestLottoNumber() {
         _latestRoundFetchFailed.value = false
+        _lastFetchErrorDebug.value = null
         viewModelScope.launch {
             var round = estimateLatestRound()
             var attemptsLeft = 15 // 추정 회차가 실제와 몇 회 차이나도 안전하게 찾아내도록 넉넉히 재시도
             var succeeded = false
+            var lastError: String? = null
 
             while (attemptsLeft > 0 && !succeeded) {
                 try {
@@ -166,11 +172,13 @@ class AnalysisViewModel @Inject constructor(
                         succeeded = true
                     } else {
                         // 아직 발표되지 않은 회차 -> 한 회차 낮춰서 다시 시도
+                        lastError = "회차 $round 응답: returnValue=fail (해당 회차 미발표 또는 존재하지 않음)"
                         round -= 1
                         attemptsLeft -= 1
                     }
                 } catch (e: Exception) {
                     // 네트워크 오류 등 - 더 낮은 회차로도 재시도해보되, 무한정 돌지 않도록 시도 횟수는 소모한다
+                    lastError = "회차 $round 요청 중 예외: ${e.javaClass.simpleName} - ${e.message}"
                     e.printStackTrace()
                     round -= 1
                     attemptsLeft -= 1
@@ -180,6 +188,7 @@ class AnalysisViewModel @Inject constructor(
             if (!succeeded) {
                 // 끝까지 실패하면 "불러오는 중..."에 무한정 머무르지 않도록 실패 상태를 명확히 표시한다
                 _latestRoundFetchFailed.value = true
+                _lastFetchErrorDebug.value = lastError
             }
         }
     }
