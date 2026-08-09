@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Calendar
 import java.util.TimeZone
@@ -154,7 +155,21 @@ class AnalysisViewModel @Inject constructor(
                 try {
                     val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round"
                     val responseJson = withContext(Dispatchers.IO) {
-                        URL(urlString).readText()
+                        val connection = URL(urlString).openConnection() as HttpURLConnection
+                        try {
+                            connection.requestMethod = "GET"
+                            connection.connectTimeout = 8000
+                            connection.readTimeout = 8000
+                            // User-Agent가 없으면 브라우저가 아닌 요청으로 판단해 HTML 차단 페이지를 돌려주는 경우가 있어 명시적으로 지정
+                            connection.setRequestProperty(
+                                "User-Agent",
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                            )
+                            connection.setRequestProperty("Accept", "application/json, text/plain, */*")
+                            connection.inputStream.bufferedReader().use { it.readText() }
+                        } finally {
+                            connection.disconnect()
+                        }
                     }
 
                     val jsonObject = JSONObject(responseJson)
