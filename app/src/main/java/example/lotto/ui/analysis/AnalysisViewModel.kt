@@ -154,6 +154,7 @@ class AnalysisViewModel @Inject constructor(
             while (attemptsLeft > 0 && !succeeded) {
                 try {
                     val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round"
+                    var debugResponseCode: Int? = null
                     val responseJson = withContext(Dispatchers.IO) {
                         val connection = URL(urlString).openConnection() as HttpURLConnection
                         try {
@@ -174,28 +175,39 @@ class AnalysisViewModel @Inject constructor(
                                 "https://www.dhlottery.co.kr/gameResult.do?method=byWin"
                             )
                             connection.instanceFollowRedirects = true
+                            // "브라우저 주소창 직접 이동"과 "페이지 내 자바스크립트(AJAX) 호출"을
+                            // 이 헤더로 구분해서 전자만 차단(홈페이지로 리다이렉트)하는 경우가 많다.
+                            // 실제 결과 페이지의 JS가 보내는 것과 동일하게 이 헤더를 추가해 우회를 시도한다.
+                            connection.setRequestProperty("X-Requested-With", "XMLHttpRequest")
+                            debugResponseCode = connection.responseCode
                             connection.inputStream.bufferedReader().use { it.readText() }
                         } finally {
                             connection.disconnect()
                         }
                     }
 
-                    val jsonObject = JSONObject(responseJson)
-                    if (jsonObject.getString("returnValue") == "success") {
-                        val nums = listOf(
-                            jsonObject.getInt("drwtNo1"),
-                            jsonObject.getInt("drwtNo2"),
-                            jsonObject.getInt("drwtNo3"),
-                            jsonObject.getInt("drwtNo4"),
-                            jsonObject.getInt("drwtNo5"),
-                            jsonObject.getInt("drwtNo6")
-                        )
-                        _latestWinNumbers.value = nums
-                        _latestRound.value = round
-                        succeeded = true
-                    } else {
-                        // 아직 발표되지 않은 회차 -> 한 회차 낮춰서 다시 시도
-                        lastError = "회차 $round 응답: returnValue=fail (해당 회차 미발표 또는 존재하지 않음)"
+                    try {
+                        val jsonObject = JSONObject(responseJson)
+                        if (jsonObject.getString("returnValue") == "success") {
+                            val nums = listOf(
+                                jsonObject.getInt("drwtNo1"),
+                                jsonObject.getInt("drwtNo2"),
+                                jsonObject.getInt("drwtNo3"),
+                                jsonObject.getInt("drwtNo4"),
+                                jsonObject.getInt("drwtNo5"),
+                                jsonObject.getInt("drwtNo6")
+                            )
+                            _latestWinNumbers.value = nums
+                            _latestRound.value = round
+                            succeeded = true
+                        } else {
+                            lastError = "회차 $round 응답(HTTP $debugResponseCode): returnValue=fail (해당 회차 미발표 또는 존재하지 않음)"
+                            round -= 1
+                            attemptsLeft -= 1
+                        }
+                    } catch (parseError: Exception) {
+                        val snippet = responseJson.take(80).replace("\n", " ")
+                        lastError = "회차 $round 응답(HTTP $debugResponseCode) JSON 파싱 실패: \"$snippet...\""
                         round -= 1
                         attemptsLeft -= 1
                     }
