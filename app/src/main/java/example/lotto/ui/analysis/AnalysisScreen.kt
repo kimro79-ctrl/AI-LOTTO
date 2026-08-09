@@ -134,6 +134,14 @@ fun AnalysisScreen(
                 }
             }
 
+            // 3-2. 직접 번호 선택 (로또 용지 스타일)
+            item {
+                ManualPickSection(
+                    latestWinNumbers = latestWinNumbers,
+                    onSaveClick = { numbers -> viewModel.saveSingleSet(numbers) }
+                )
+            }
+
             // 4. 생성된 번호 조합 리스트 (카드 섹션) - 카드마다 펼쳐서 상세 분석을 볼 수 있음
             if (numberSets.isNotEmpty()) {
                 item {
@@ -521,11 +529,180 @@ fun ConditionChangeBanner(
 }
 
 /**
- * 조합 1개를 보여주는 카드. 우측 화살표를 누르면 통계 분석 리포트가 펼쳐진다.
+ * 로또 용지처럼 1~45 번호를 직접 눌러서 6개를 고르는 섹션.
+ * 6개가 다 채워지면 AI 추천 조합과 완전히 동일한 통계 분석 리포트를 보여주고,
+ * 마음에 들면 개별 저장할 수 있다.
  */
 @Composable
-fun LottoSetCard(
-    setIndex: Int,
+fun ManualPickSection(
+    latestWinNumbers: List<Int>,
+    onSaveClick: (List<Int>) -> Unit
+) {
+    var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
+    var saved by remember { mutableStateOf(false) }
+
+    // 번호가 바뀌면 저장 완료 상태는 초기화
+    LaunchedEffect(selectedNumbers) {
+        saved = false
+    }
+
+    val sortedSelected = selectedNumbers.sorted()
+    val isComplete = sortedSelected.size == 6
+
+    val analysis = remember(sortedSelected) {
+        if (isComplete) analyzeLottoSet(sortedSelected, latestWinNumbers) else null
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "번호 직접 선택하기",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+                Surface(
+                    color = if (isComplete) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFFF1F5F9),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = "${sortedSelected.size} / 6",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isComplete) Color(0xFF10B981) else Color(0xFF64748B),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "로또 용지처럼 원하는 번호 6개를 직접 눌러 선택해보세요",
+                fontSize = 12.sp,
+                color = Color(0xFF64748B)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 1~45 번호 그리드 (9열 x 5행)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                (1..45).chunked(9).forEach { rowNumbers ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        rowNumbers.forEach { number ->
+                            val isSelected = number in selectedNumbers
+                            val canSelectMore = selectedNumbers.size < 6
+
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isSelected -> manualBallColor(number)
+                                            else -> Color(0xFFF1F5F9)
+                                        }
+                                    )
+                                    .clickable(enabled = isSelected || canSelectMore) {
+                                        selectedNumbers = if (isSelected) {
+                                            selectedNumbers - number
+                                        } else {
+                                            selectedNumbers + number
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = number.toString(),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (sortedSelected.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    sortedSelected.forEach { number ->
+                        LottoBall(number = number, size = 30)
+                    }
+                }
+            }
+
+            if (isComplete && analysis != null) {
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(modifier = Modifier.height(14.dp))
+                AnalysisReportSection(analysis)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedButton(
+                        onClick = { selectedNumbers = emptySet() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("다시 선택", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = {
+                            onSaveClick(sortedSelected)
+                            saved = true
+                        },
+                        enabled = !saved,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (saved) Color(0xFFE2E8F0) else Color(0xFF10B981),
+                            disabledContainerColor = Color(0xFFE2E8F0)
+                        )
+                    ) {
+                        Text(
+                            text = if (saved) "저장됨" else "이 조합 저장하기",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (saved) Color(0xFF64748B) else Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun manualBallColor(number: Int): Color = when (number) {
+    in 1..10 -> Color(0xFFF59E0B)
+    in 11..20 -> Color(0xFF3B82F6)
+    in 21..30 -> Color(0xFFEF4444)
+    in 31..40 -> Color(0xFF64748B)
+    else -> Color(0xFF10B981)
+}
+
+
     numbers: List<Int>,
     latestWinNumbers: List<Int>,
     initiallyExpanded: Boolean = false,
@@ -674,7 +851,7 @@ fun AnalysisReportSection(analysis: LottoSetAnalysis) {
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = "분석 점수 ${analysis.score}점",
+                    text = "균형도 점수 ${analysis.score}점",
                     color = scoreColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -740,6 +917,14 @@ fun AnalysisReportSection(analysis: LottoSetAnalysis) {
                 value = "${analysis.occupiedDecadeBins} / 5구간"
             )
         }
+
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "⚠️ 이 분석결과는 7대 로직에 의한 통계적 결과 점수를 나타내는 참고용 지표입니다. 로또는 매회 완전히 독립적인 추첨이라 이 점수와 실제 당첨 확률은 무관합니다.",
+            fontSize = 10.sp,
+            color = Color(0xFF94A3B8),
+            lineHeight = 14.sp
+        )
     }
 }
 
