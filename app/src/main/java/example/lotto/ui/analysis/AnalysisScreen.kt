@@ -38,6 +38,7 @@ fun AnalysisScreen(
     val selectedCondition by viewModel.selectedCondition.collectAsState()
     val latestWinNumbers by viewModel.latestWinNumbers.collectAsState()
     val latestRound by viewModel.latestRound.collectAsState()
+    val latestRoundFetchFailed by viewModel.latestRoundFetchFailed.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
@@ -78,7 +79,12 @@ fun AnalysisScreen(
         ) {
             // 1. 회차 표시 배너 (1235회 당첨 번호)
             item {
-                LatestWinBanner(winNumbers = latestWinNumbers, round = latestRound)
+                LatestWinBanner(
+                    winNumbers = latestWinNumbers,
+                    round = latestRound,
+                    fetchFailed = latestRoundFetchFailed,
+                    onRetryClick = { viewModel.retryFetchLatestLottoNumber() }
+                )
             }
 
             // 2. 스마트 패턴분석 영역
@@ -262,7 +268,12 @@ fun LogicInfoDialog(onDismiss: () -> Unit) {
 
 // 회차 정보가 포함된 상단 배너 (실제 조회된 최신 회차를 동적으로 표시)
 @Composable
-fun LatestWinBanner(winNumbers: List<Int>, round: Int?) {
+fun LatestWinBanner(
+    winNumbers: List<Int>,
+    round: Int?,
+    fetchFailed: Boolean = false,
+    onRetryClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -278,12 +289,37 @@ fun LatestWinBanner(winNumbers: List<Int>, round: Int?) {
                 .padding(16.dp)
         ) {
             Column {
-                Text(
-                    text = if (round != null) "${round}회 당첨 번호" else "최신 당첨 번호 불러오는 중...",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = when {
+                            fetchFailed -> "최신 당첨 번호를 불러오지 못했습니다"
+                            round != null -> "${round}회 당첨 번호"
+                            else -> "최신 당첨 번호 불러오는 중..."
+                        },
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (fetchFailed) {
+                        Surface(
+                            color = Color.White,
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { onRetryClick() }
+                        ) {
+                            Text(
+                                text = "다시 시도",
+                                color = Color(0xFF0284C7),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
