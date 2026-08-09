@@ -118,6 +118,10 @@ class AnalysisViewModel @Inject constructor(
     private val _latestRound = MutableStateFlow<Int?>(null)
     val latestRound: StateFlow<Int?> = _latestRound.asStateFlow()
 
+    // 여러 번 재시도해도 최신 회차를 못 가져온 경우 true. 화면에서 "불러오는 중" 대신 실패 안내로 전환하는 데 쓴다.
+    private val _latestRoundFetchFailed = MutableStateFlow(false)
+    val latestRoundFetchFailed: StateFlow<Boolean> = _latestRoundFetchFailed.asStateFlow()
+
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
@@ -129,13 +133,19 @@ class AnalysisViewModel @Inject constructor(
         _selectedCondition.value = condition
     }
 
-    private fun fetchLatestLottoNumber() {
-        viewModelScope.launch {
-            try {
-                var round = estimateLatestRound()
-                var attemptsLeft = 3 // 혹시 이번 주 추첨이 아직 발표 전이면 한 회차씩 낮춰서 최대 3번 재시도
+    fun retryFetchLatestLottoNumber() {
+        fetchLatestLottoNumber()
+    }
 
-                while (attemptsLeft > 0) {
+    private fun fetchLatestLottoNumber() {
+        _latestRoundFetchFailed.value = false
+        viewModelScope.launch {
+            var round = estimateLatestRound()
+            var attemptsLeft = 15 // 추정 회차가 실제와 몇 회 차이나도 안전하게 찾아내도록 넉넉히 재시도
+            var succeeded = false
+
+            while (attemptsLeft > 0 && !succeeded) {
+                try {
                     val urlString = "https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=$round"
                     val responseJson = withContext(Dispatchers.IO) {
                         URL(urlString).readText()
@@ -153,15 +163,23 @@ class AnalysisViewModel @Inject constructor(
                         )
                         _latestWinNumbers.value = nums
                         _latestRound.value = round
-                        break
+                        succeeded = true
                     } else {
                         // 아직 발표되지 않은 회차 -> 한 회차 낮춰서 다시 시도
                         round -= 1
                         attemptsLeft -= 1
                     }
+                } catch (e: Exception) {
+                    // 네트워크 오류 등 - 더 낮은 회차로도 재시도해보되, 무한정 돌지 않도록 시도 횟수는 소모한다
+                    e.printStackTrace()
+                    round -= 1
+                    attemptsLeft -= 1
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            }
+
+            if (!succeeded) {
+                // 끝까지 실패하면 "불러오는 중..."에 무한정 머무르지 않도록 실패 상태를 명확히 표시한다
+                _latestRoundFetchFailed.value = true
             }
         }
     }
