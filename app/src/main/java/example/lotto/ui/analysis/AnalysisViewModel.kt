@@ -99,7 +99,7 @@ class AnalysisViewModel @Inject constructor(
     private val _numberSets = MutableStateFlow<List<List<Int>>>(emptyList())
     val numberSets: StateFlow<List<List<Int>>> = _numberSets.asStateFlow()
 
-    private val _selectedCondition = MutableStateFlow("고도화 종합 분석 (7대 로직 적용)")
+    private val _selectedCondition = MutableStateFlow("고도화 종합 분석 (6대 로직 적용)")
     val selectedCondition: StateFlow<String> = _selectedCondition.asStateFlow()
 
     private val _saveMessage = MutableStateFlow<String?>(null)
