@@ -321,7 +321,9 @@ fun CheckWinResultBanner() {
                 try {
                     val intent = android.content.Intent(
                         android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://www.dhlottery.co.kr/gameResult.do?method=byWin")
+                        // 특정 결과 페이지 대신 메인 홈페이지로 연결 - 메인 화면에 최신 회차 당첨번호가
+                        // 바로 표시되고, 하위 경로보다 접속이 훨씬 안정적이다.
+                        android.net.Uri.parse("https://www.dhlottery.co.kr/common.do?method=main")
                     ).apply {
                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
@@ -709,28 +711,12 @@ fun ManualPickDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // 용지 느낌의 박스 (상단 가격 바 + 번호 그리드)
+                    // 용지 느낌의 박스 (번호 그리드) - 금액 표시는 제외
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.dp, Color(0xFFF9A8A8), RoundedCornerShape(4.dp))
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(34.dp)
-                                .background(Color(0xFFF2626B)),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Text(
-                                text = "${sortedSelected.size * 1000}원",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(end = 14.dp)
-                            )
-                        }
-
                         // 1~45 번호 그리드 (7열)
                         Column(
                             modifier = Modifier.padding(14.dp),
