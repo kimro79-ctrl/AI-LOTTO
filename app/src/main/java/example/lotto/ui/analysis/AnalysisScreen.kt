@@ -70,7 +70,11 @@ fun AnalysisScreen(
                     Text(
                         text = "AI 스마트 로또 분석",
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E293B)
+                        style = androidx.compose.ui.text.TextStyle(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                            )
+                        )
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -487,7 +491,7 @@ fun SmartPatternAnalysisSection(
             }
 
             Text(
-                text = "홀짝 균형, 고저 비율, 연속번호 제한 등 통계적 필터를 실시간 반영합니다.",
+                text = "홀짝 균형, 고저 비율, 연속번호 제한 등 통계적 필터를 실시간 반영합니다. 생성된 조합은 몬테카를로 시뮬레이션으로 실제 당첨 확률까지 직접 검증해볼 수 있어요.",
                 fontSize = 12.sp,
                 color = Color(0xFF64748B),
                 lineHeight = 16.sp
@@ -1510,10 +1514,17 @@ fun SimulationDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "⚠️ 이 확률은 실제 로또 6/45 공식 등수별 당첨 확률(전체 조합 8,145,060개 기준)로 계산됐습니다. " +
-                            "완전 무작위 추첨이기 때문에 어떤 번호를 선택하든 확률은 항상 동일합니다. " +
-                            "몬테카를로 시뮬레이션은 6개 메인 번호와 보너스 번호를 매번 새로 무작위 추첨해서 이 번호가 몇 번 " +
-                            "적중하는지 실제로 세어본 결과이며, 시행 횟수가 많을수록 위 이론값에 가까워집니다.",
+                    text = "📊 이론값은 로또 6/45의 전체 조합 8,145,060개를 기준으로 계산한 실제 공식 확률입니다. " +
+                            "완전 무작위 추첨이므로 어떤 번호를 선택하든 확률은 항상 동일합니다.",
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 14.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "🎲 몬테카를로 시뮬레이션은 예측이 아니라 검증입니다. 6개 메인 번호와 보너스 번호를 매번 새로 무작위 " +
+                            "추첨해서 이 번호가 실제로 몇 번 적중하는지 세어본 결과이며, 시행 횟수가 많을수록 위 이론값에 " +
+                            "가까워지는지 눈으로 확인하는 용도입니다.",
                     fontSize = 10.sp,
                     color = Color(0xFF94A3B8),
                     lineHeight = 14.sp
@@ -1628,7 +1639,7 @@ fun AnalysisReportSection(analysis: LottoSetAnalysis) {
 
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = "⚠️ 이 분석결과는 7대 로직에 의한 통계적 결과 점수를 나타내는 참고용 지표입니다. 로또는 매회 완전히 독립적인 추첨이라 이 점수와 실제 당첨 확률은 무관합니다.",
+            text = "⚠️ 이 점수는 번호 배열이 통계적으로 얼마나 자연스러운지를 7대 로직 기준으로 계산한 참고용 지표입니다. 로또는 매회 완전히 독립적인 무작위 추첨이므로, 이 점수가 높다고 해서 실제 당첨 확률이 올라가는 것은 아닙니다.",
             fontSize = 10.sp,
             color = Color(0xFF94A3B8),
             lineHeight = 14.sp
@@ -1756,7 +1767,7 @@ fun ConditionSelectDialog(
     val conditions = listOf(
         "고도화 종합 분석 (7대 로직 적용)",
         "완전 무작위 추첨 (일반 자동)",
-        "최근 당첨 번호 이월 패턴 분석",
+        "AC값(번호 복잡도) 기반 필터링",
         "홀짝 / 고저 균형 필터링",
         "끝수 및 연속 번호 조합 제한"
     )
