@@ -100,9 +100,14 @@ fun HistoryScreen(
         ) {
             Text(
                 text = "저장된 번호 내역",
-                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
+                fontSize = 22.sp,
+                style = androidx.compose.ui.text.TextStyle(
+                    fontSize = 22.sp,
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                    )
+                )
             )
 
             if (historyList.isNotEmpty()) {
