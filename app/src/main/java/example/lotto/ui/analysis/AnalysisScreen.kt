@@ -130,7 +130,7 @@ fun AnalysisScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "6대 로직이 뭔가요?",
+                        text = "7대 로직이 뭔가요?",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0D9488)
@@ -248,7 +248,7 @@ fun AnalysisScreen(
     }
 }
 
-// 6대 로직 각각에 대한 이름 + 짧은 설명
+// 7대 로직 각각에 대한 이름 + 짧은 설명
 private data class LogicInfoItem(val title: String, val description: String)
 
 private val sevenLogics = listOf(
@@ -257,7 +257,8 @@ private val sevenLogics = listOf(
     LogicInfoItem("③ 연속번호 제한", "번호가 연달아 이어지는 조합(예: 12,13)을 배제합니다."),
     LogicInfoItem("④ 끝수 분산", "끝자리 숫자가 3개 이상 겹치지 않도록 분산시킵니다."),
     LogicInfoItem("⑤ 총합 적정구간", "6개 번호의 합이 통계적으로 흔한 100~175 구간에 들도록 유도합니다."),
-    LogicInfoItem("⑥ 구간 분포", "1~45를 5개 구간으로 나눠 번호가 여러 구간에 고르게 퍼지도록 합니다.")
+    LogicInfoItem("⑥ 구간 분포", "1~45를 5개 구간으로 나눠 번호가 여러 구간에 고르게 퍼지도록 합니다."),
+    LogicInfoItem("⑦ AC값(번호 복잡도)", "번호 간 모든 차이값의 다양성을 측정하는 통계 지표로, 값이 높을수록(7~10) 규칙적인 패턴 없이 무작위성이 높은 조합입니다.")
 )
 
 @Composable
@@ -266,7 +267,7 @@ fun LogicInfoDialog(onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "고도화 종합 분석 - 6대 로직",
+                text = "고도화 종합 분석 - 7대 로직",
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 color = Color(0xFF0F172A)
@@ -1286,17 +1287,38 @@ fun AnalysisReportSection(analysis: LottoSetAnalysis) {
             passedText = "적정 구간(100~175)",
             failedText = "통계적 적정 구간 벗어남"
         )
-
-        // 구간 분포 정보
-        InfoChip(
-            modifier = Modifier.fillMaxWidth(),
-            title = "구간 분포",
-            value = "${analysis.occupiedDecadeBins} / 5구간"
+        AnalysisCheckRow(
+            label = "AC값 (${analysis.acValue})",
+            passed = analysis.isAcGood,
+            passedText = "무작위성 양호(7 이상)",
+            failedText = "규칙적인 패턴 존재"
         )
+
+        // 구간 분포 / 표준편차 / 평균 간격 정보
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            InfoChip(
+                modifier = Modifier.weight(1f),
+                title = "구간 분포",
+                value = "${analysis.occupiedDecadeBins} / 5구간"
+            )
+            InfoChip(
+                modifier = Modifier.weight(1f),
+                title = "표준편차",
+                value = String.format("%.1f", analysis.stdDeviation)
+            )
+            InfoChip(
+                modifier = Modifier.weight(1f),
+                title = "평균 간격",
+                value = String.format("%.1f", analysis.avgGap)
+            )
+        }
 
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = "⚠️ 이 분석결과는 6대 로직에 의한 통계적 결과 점수를 나타내는 참고용 지표입니다. 로또는 매회 완전히 독립적인 추첨이라 이 점수와 실제 당첨 확률은 무관합니다.",
+            text = "⚠️ 이 분석결과는 7대 로직에 의한 통계적 결과 점수를 나타내는 참고용 지표입니다. 로또는 매회 완전히 독립적인 추첨이라 이 점수와 실제 당첨 확률은 무관합니다.",
             fontSize = 10.sp,
             color = Color(0xFF94A3B8),
             lineHeight = 14.sp
@@ -1422,7 +1444,7 @@ fun ConditionSelectDialog(
     onDismiss: () -> Unit
 ) {
     val conditions = listOf(
-        "고도화 종합 분석 (6대 로직 적용)",
+        "고도화 종합 분석 (7대 로직 적용)",
         "완전 무작위 추첨 (일반 자동)",
         "최근 당첨 번호 이월 패턴 분석",
         "홀짝 / 고저 균형 필터링",
