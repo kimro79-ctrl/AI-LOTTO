@@ -69,8 +69,10 @@ fun AnalysisScreen(
                 title = {
                     Text(
                         text = "AI 스마트 로또 분석",
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         style = androidx.compose.ui.text.TextStyle(
+                            fontSize = 22.sp,
                             brush = Brush.horizontalGradient(
                                 colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
                             )
