@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -685,6 +689,7 @@ fun ManualPickDialog(
 ) {
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
+    var showSimulationDialog by remember { mutableStateOf(false) }
 
     // 번호가 바뀌면 저장 완료 상태는 초기화
     LaunchedEffect(selectedNumbers) {
@@ -909,12 +914,36 @@ fun ManualPickDialog(
                                 color = if (saved) Color(0xFF64748B) else Color.White
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { showSimulationDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "💰 당첨 확률 시뮬레이션",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
+    }
+
+    if (showSimulationDialog) {
+        SimulationDialog(
+            numbers = sortedSelected,
+            onDismiss = { showSimulationDialog = false }
+        )
     }
 }
 
@@ -1098,6 +1127,7 @@ fun LottoSetCard(
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
+    var showSimulationDialog by remember { mutableStateOf(false) }
     val analysis = remember(numbers) {
         analyzeLottoSet(numbers)
     }
@@ -1204,8 +1234,32 @@ fun LottoSetCard(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showSimulationDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "💰 당첨 확률 시뮬레이션",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7C3AED)
+                    )
+                }
             }
         }
+    }
+
+    if (showSimulationDialog) {
+        SimulationDialog(
+            numbers = numbers,
+            onDismiss = { showSimulationDialog = false }
+        )
     }
 }
 
@@ -1213,6 +1267,262 @@ fun LottoSetCard(
  * 펼쳤을 때 보여줄 통계 분석 리포트.
  * 홀짝/고저 비율 게이지, 연속번호·끝수중복 여부, 총합, 구간 분포, 종합 점수를 표시한다.
  */
+// 로또 6/45 공식 등수별 확률 (전체 조합 수 C(45,6) = 8,145,060 기준으로 계산된 실제 통계값).
+// 어떤 번호를 고르든 완전 무작위 추첨이므로 이 확률은 항상 동일하다 - 특정 번호가 더 유리하지 않다.
+private data class RankOdds(val rank: Int, val label: String, val singleGameProbability: Double)
+
+private val LOTTO_RANK_ODDS = listOf(
+    RankOdds(1, "1등 (6개 일치)", 1.0 / 8_145_060.0),
+    RankOdds(2, "2등 (5개+보너스)", 6.0 / 8_145_060.0),
+    RankOdds(3, "3등 (5개 일치)", 228.0 / 8_145_060.0),
+    RankOdds(4, "4등 (4개 일치)", 11_115.0 / 8_145_060.0),
+    RankOdds(5, "5등 (3개 일치)", 182_780.0 / 8_145_060.0)
+)
+
+private fun formatProbabilityPercent(p: Double): String {
+    val percent = p * 100
+    return when {
+        percent >= 1.0 -> String.format("%.2f%%", percent)
+        percent >= 0.01 -> String.format("%.4f%%", percent)
+        else -> String.format("%.6f%%", percent)
+    }
+}
+
+private fun formatOddsFraction(p: Double): String {
+    if (p <= 0.0) return "-"
+    val n = (1.0 / p).roundToLong()
+    return "약 1 / ${"%,d".format(n)}"
+}
+
+/**
+ * 몬테카를로 시뮬레이션: 사용자가 고른 6개 번호를 고정해두고, 실제 로또 추첨과 동일한 방식으로
+ * (6개 메인 번호 + 보너스 번호 1개) 가상 추첨을 trials번 반복해서 등수별 적중 횟수를 센다.
+ * 결과는 시행 횟수가 많아질수록 이론적 확률(LOTTO_RANK_ODDS)에 점점 가까워져야 정상이다.
+ * CPU 연산량이 있어 반드시 Dispatchers.Default(백그라운드 스레드)에서 실행한다.
+ */
+private suspend fun runMonteCarloSimulation(userNumbers: List<Int>, trials: Int): IntArray {
+    return withContext(Dispatchers.Default) {
+        // index: 0=1등, 1=2등, 2=3등, 3=4등, 4=5등, 5=낙첨
+        val rankCounts = IntArray(6)
+
+        val userMarked = BooleanArray(46)
+        userNumbers.forEach { if (it in 1..45) userMarked[it] = true }
+
+        val rng = java.util.Random()
+        val used = BooleanArray(46)
+        val mainDraw = IntArray(6)
+
+        repeat(trials) {
+            // Floyd's algorithm으로 1~45 중 서로 다른 6개를 무작위로 뽑는다 (매 시행 O(6))
+            var idx = 0
+            for (j in 40..45) {
+                val t = rng.nextInt(j) + 1
+                if (!used[t]) {
+                    used[t] = true
+                    mainDraw[idx++] = t
+                } else {
+                    used[j] = true
+                    mainDraw[idx++] = j
+                }
+            }
+
+            // 보너스 번호: 메인 6개와 겹치지 않는 번호 중 하나
+            var bonus: Int
+            do {
+                bonus = rng.nextInt(45) + 1
+            } while (used[bonus])
+
+            var matches = 0
+            for (n in mainDraw) if (userMarked[n]) matches++
+
+            when {
+                matches == 6 -> rankCounts[0]++
+                matches == 5 && userMarked[bonus] -> rankCounts[1]++
+                matches == 5 -> rankCounts[2]++
+                matches == 4 -> rankCounts[3]++
+                matches == 3 -> rankCounts[4]++
+                else -> rankCounts[5]++
+            }
+
+            for (n in mainDraw) used[n] = false
+        }
+
+        rankCounts
+    }
+}
+
+/**
+ * "이 번호가 이번 회차에 등수별로 당첨될 확률이 얼마나 될까?"를 보여주는 시뮬레이션 팝업.
+ * 확률 자체는 어떤 번호를 쓰든 동일하므로, numbers는 화면 상단에 "이 번호" 표시용으로만 쓰인다.
+ */
+@Composable
+fun SimulationDialog(
+    numbers: List<Int>,
+    onDismiss: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var isSimulating by remember { mutableStateOf(false) }
+    var simulationResult by remember { mutableStateOf<IntArray?>(null) }
+    val trials = 100_000
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "당첨 확률 시뮬레이션",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    numbers.sorted().forEach { number ->
+                        LottoBall(number = number, size = 26)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "이번 회차 기준 등수별 당첨 확률 (이론값)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LOTTO_RANK_ODDS.forEachIndexed { index, rankOdds ->
+                        val empiricalCount = simulationResult?.get(index)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = rankOdds.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF334155)
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = formatProbabilityPercent(rankOdds.singleGameProbability),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0EA5E9)
+                                    )
+                                    Text(
+                                        text = formatOddsFraction(rankOdds.singleGameProbability),
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                                if (empiricalCount != null) {
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = formatProbabilityPercent(empiricalCount.toDouble() / trials),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF7C3AED)
+                                        )
+                                        Text(
+                                            text = "${empiricalCount}회 적중",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (simulationResult != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(text = "🔵 이론값   🟣 시뮬레이션값(${"%,d".format(trials)}회 가상추첨)", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        if (!isSimulating) {
+                            isSimulating = true
+                            coroutineScope.launch {
+                                val result = runMonteCarloSimulation(numbers, trials)
+                                simulationResult = result
+                                isSimulating = false
+                            }
+                        }
+                    },
+                    enabled = !isSimulating,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                ) {
+                    if (isSimulating) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("가상 추첨 ${"%,d".format(trials)}회 진행 중...", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    } else {
+                        Text(
+                            text = if (simulationResult == null) "🎲 몬테카를로 시뮬레이션 실행 (${"%,d".format(trials)}회)" else "🎲 다시 실행",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "⚠️ 이 확률은 실제 로또 6/45 공식 등수별 당첨 확률(전체 조합 8,145,060개 기준)로 계산됐습니다. " +
+                            "완전 무작위 추첨이기 때문에 어떤 번호를 선택하든 확률은 항상 동일합니다. " +
+                            "몬테카를로 시뮬레이션은 6개 메인 번호와 보너스 번호를 매번 새로 무작위 추첨해서 이 번호가 몇 번 " +
+                            "적중하는지 실제로 세어본 결과이며, 시행 횟수가 많을수록 위 이론값에 가까워집니다.",
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun AnalysisReportSection(analysis: LottoSetAnalysis) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
