@@ -28,6 +28,10 @@ data class LottoSetAnalysis(
     val sum: Int,
     val isSumInNormalRange: Boolean,   // 100~175: 역대 당첨번호 총합의 대다수가 속하는 구간
     val occupiedDecadeBins: Int,       // 1-10 / 11-20 / 21-30 / 31-40 / 41-45 중 몇 구간에 분포되어 있는지 (최대 5)
+    val acValue: Int,                  // AC(Arithmetic Complexity)값. 0~10, 높을수록 번호 간 규칙성이 낮음(무작위성 높음)
+    val isAcGood: Boolean,             // AC값 7 이상이면 "양호"로 판단 (통계적으로 흔히 쓰이는 기준)
+    val stdDeviation: Double,          // 6개 번호의 표준편차 - 번호가 얼마나 고르게 퍼져있는지
+    val avgGap: Double,                // 정렬된 번호 사이 평균 간격
     val score: Int                     // 0~100 종합 점수
 )
 
@@ -60,21 +64,43 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 
     val decadeBins = sorted.map { (it - 1) / 10 }.distinct().size
 
+    // AC값(Arithmetic Complexity): 6개 번호에서 나올 수 있는 모든 쌍의 차이값 중,
+    // 서로 다른 값이 몇 개인지를 센 뒤 5를 뺀 값(6개 숫자의 최소 가능 조합 수가 5이므로).
+    // 1,2,3,4,5,6처럼 규칙적인 조합은 0에 가깝고, 무작위성이 높을수록 7~10에 가까워진다.
+    val pairwiseDiffs = mutableSetOf<Int>()
+    for (i in sorted.indices) {
+        for (j in i + 1 until sorted.size) {
+            pairwiseDiffs.add(sorted[j] - sorted[i])
+        }
+    }
+    val acValue = (pairwiseDiffs.size - 5).coerceIn(0, 10)
+    val isAcGood = acValue >= 7
+
+    // 표준편차: 6개 번호가 평균으로부터 얼마나 퍼져있는지
+    val mean = sorted.average()
+    val variance = sorted.sumOf { (it - mean) * (it - mean) } / sorted.size
+    val stdDeviation = kotlin.math.sqrt(variance)
+
+    // 정렬된 번호 사이의 평균 간격
+    val gaps = (0 until sorted.size - 1).map { sorted[it + 1] - sorted[it] }
+    val avgGap = gaps.average()
+
     var score = 0
     score += when (oddCount) {
-        3 -> 25
-        2, 4 -> 15
-        else -> 5
+        3 -> 20
+        2, 4 -> 12
+        else -> 4
     }
     score += when (lowCount) {
-        3 -> 25
-        2, 4 -> 15
-        else -> 5
+        3 -> 20
+        2, 4 -> 12
+        else -> 4
     }
-    score += if (!hasConsecutive) 20 else 5
-    score += if (!hasTooManySameEndDigits) 20 else 10
-    score += if (isSumInNormalRange) 10 else 5
-    score += if (decadeBins >= 4) 5 else 0
+    score += if (!hasConsecutive) 15 else 4
+    score += if (!hasTooManySameEndDigits) 15 else 8
+    score += if (isSumInNormalRange) 8 else 3
+    score += if (decadeBins >= 4) 7 else 2
+    score += if (isAcGood) 15 else if (acValue >= 4) 8 else 2
 
     return LottoSetAnalysis(
         oddCount = oddCount,
@@ -86,6 +112,10 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
         sum = sum,
         isSumInNormalRange = isSumInNormalRange,
         occupiedDecadeBins = decadeBins,
+        acValue = acValue,
+        isAcGood = isAcGood,
+        stdDeviation = stdDeviation,
+        avgGap = avgGap,
         score = score.coerceAtMost(100)
     )
 }
@@ -99,7 +129,7 @@ class AnalysisViewModel @Inject constructor(
     private val _numberSets = MutableStateFlow<List<List<Int>>>(emptyList())
     val numberSets: StateFlow<List<List<Int>>> = _numberSets.asStateFlow()
 
-    private val _selectedCondition = MutableStateFlow("고도화 종합 분석 (6대 로직 적용)")
+    private val _selectedCondition = MutableStateFlow("고도화 종합 분석 (7대 로직 적용)")
     val selectedCondition: StateFlow<String> = _selectedCondition.asStateFlow()
 
     private val _saveMessage = MutableStateFlow<String?>(null)
