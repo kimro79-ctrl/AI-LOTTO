@@ -84,9 +84,15 @@ fun AnalysisScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // 1. 당첨번호 확인 링크 배너 (앱 내 자동 조회 대신 공식 사이트로 안내)
+            // 1. 당첨번호 확인 링크 배너 + 판매점 찾기 버튼
             item {
-                CheckWinResultBanner()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CheckWinResultBanner(modifier = Modifier.weight(1f))
+                    FindStoreButton(modifier = Modifier.weight(1f))
+                }
             }
 
             // 2. 스마트 패턴분석 영역
@@ -310,13 +316,12 @@ fun LogicInfoDialog(onDismiss: () -> Unit) {
 // 당첨번호 확인 링크 배너. 동행복권 서버가 앱의 자동 요청을 차단하고 있어
 // 앱 안에서 번호를 직접 보여주는 대신, 공식 사이트로 바로 이동하는 링크만 제공한다.
 @Composable
-fun CheckWinResultBanner() {
+fun CheckWinResultBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
             .clickable {
                 try {
                     val intent = android.content.Intent(
@@ -332,42 +337,107 @@ fun CheckWinResultBanner() {
                     e.printStackTrace()
                 }
             },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(
             modifier = Modifier
+                .fillMaxWidth()
+                .height(96.dp)
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
                     )
                 )
-                .padding(18.dp)
+                .padding(14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "이번 주 당첨번호 확인하기",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "동행복권 공식 사이트에서 바로 확인하세요",
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 12.sp
-                    )
-                }
+            Column(modifier = Modifier.fillMaxSize()) {
                 Text(
-                    text = "→",
+                    text = "🎯",
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "당첨번호 확인",
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "동행복권 공식 사이트",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 10.sp
+                )
+            }
+        }
+    }
+}
+
+// 판매점 찾기 버튼. 앱 자체 지도/API 없이, 기기의 기본 지도 앱을 geo: 인텐트로 실행해
+// "로또판매점"을 검색시킨다. 위치 권한이 앱에 없어도 지도 앱이 알아서 현재 위치 기준으로 찾아준다.
+@Composable
+fun FindStoreButton(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .clickable {
+                try {
+                    val geoIntent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("geo:0,0?q=로또판매점")
+                    ).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(geoIntent)
+                } catch (e: Exception) {
+                    // 기기에 지도 앱이 없는 경우 - 웹 지도 검색으로 대체
+                    try {
+                        val fallbackIntent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://map.naver.com/v5/search/로또판매점")
+                        ).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(fallbackIntent)
+                    } catch (fallbackError: Exception) {
+                        fallbackError.printStackTrace()
+                    }
+                }
+            },
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(96.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA))
+                    )
+                )
+                .padding(14.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    text = "📍",
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "판매점 찾기",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "내 주변 지도로 보기",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 10.sp
                 )
             }
         }
