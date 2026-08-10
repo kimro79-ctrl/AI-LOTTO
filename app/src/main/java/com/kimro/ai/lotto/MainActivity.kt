@@ -27,7 +27,7 @@ import dagger.hilt.android.AndroidEntryPoint
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Analysis : Screen("analysis", "분석", Icons.Default.Settings)
     object Fortune : Screen("fortune", "운세", Icons.Default.DateRange)
-    object QrScan : Screen("qr_scan", "QR스캔", Icons.Default.Search)
+    object QrScan : Screen("qr_scan", "QR당첨확인", Icons.Default.Search)
     object History : Screen("history", "내역", Icons.Default.List)
 }
 
