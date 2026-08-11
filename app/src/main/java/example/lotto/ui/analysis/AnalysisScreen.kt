@@ -1369,7 +1369,9 @@ fun SimulationDialog(
     val coroutineScope = rememberCoroutineScope()
     var isSimulating by remember { mutableStateOf(false) }
     var simulationResult by remember { mutableStateOf<IntArray?>(null) }
-    val trials = 100_000
+    val trialOptions = listOf(100, 1_000, 10_000, 100_000)
+    var selectedTrialIndex by remember { mutableStateOf(2) } // 기본값: 10,000회 (속도/정확도 균형)
+    val trials = trialOptions[selectedTrialIndex]
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -1466,8 +1468,53 @@ fun SimulationDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "시뮬레이션 시행 횟수",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF334155)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    trialOptions.forEachIndexed { index, option ->
+                        val isSelected = index == selectedTrialIndex
+                        OutlinedButton(
+                            onClick = {
+                                if (!isSimulating && selectedTrialIndex != index) {
+                                    selectedTrialIndex = index
+                                    simulationResult = null // 시행 횟수가 바뀌면 이전 결과는 더 이상 유효하지 않으므로 초기화
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (isSelected) Color(0xFFF3E8FF) else Color.Transparent,
+                                contentColor = if (isSelected) Color(0xFF7C3AED) else Color(0xFF94A3B8)
+                            )
+                        ) {
+                            Text(
+                                text = if (option >= 10_000) "${option / 10_000}만" else "${"%,d".format(option)}",
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "🎯 횟수를 늘려도 당첨 확률이 오르진 않아요 — 검증이 더 정밀해질 뿐이에요",
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8)
+                )
+
                 if (simulationResult != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
