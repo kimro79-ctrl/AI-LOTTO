@@ -25,6 +25,9 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import java.net.HttpURLConnection
+import java.net.URL
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -696,6 +699,7 @@ fun ManualPickDialog(
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
+    var showBacktestDialog by remember { mutableStateOf(false) }
 
     // 번호가 바뀌면 저장 완료 상태는 초기화
     LaunchedEffect(selectedNumbers) {
@@ -937,6 +941,23 @@ fun ManualPickDialog(
                                 color = Color(0xFF7C3AED)
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { showBacktestDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "📜 과거 회차 백테스트",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0EA5E9)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -949,6 +970,13 @@ fun ManualPickDialog(
         SimulationDialog(
             numbers = sortedSelected,
             onDismiss = { showSimulationDialog = false }
+        )
+    }
+
+    if (showBacktestDialog) {
+        BacktestDialog(
+            numbers = sortedSelected,
+            onDismiss = { showBacktestDialog = false }
         )
     }
 }
@@ -1134,6 +1162,7 @@ fun LottoSetCard(
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
+    var showBacktestDialog by remember { mutableStateOf(false) }
     val analysis = remember(numbers) {
         analyzeLottoSet(numbers)
     }
@@ -1257,6 +1286,23 @@ fun LottoSetCard(
                         color = Color(0xFF7C3AED)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showBacktestDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "📜 과거 회차 백테스트",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0EA5E9)
+                    )
+                }
             }
         }
     }
@@ -1265,6 +1311,13 @@ fun LottoSetCard(
         SimulationDialog(
             numbers = numbers,
             onDismiss = { showSimulationDialog = false }
+        )
+    }
+
+    if (showBacktestDialog) {
+        BacktestDialog(
+            numbers = numbers,
+            onDismiss = { showBacktestDialog = false }
         )
     }
 }
@@ -1357,6 +1410,228 @@ private suspend fun runMonteCarloSimulation(userNumbers: List<Int>, trials: Int)
     }
 }
 
+// 실제 과거 당첨 회차 1개를 담는 데이터. smok95.github.io의 공개 데이터셋에서 가져온다.
+// (동행복권 도메인이 아니라 GitHub Pages라서 API 차단 문제가 없다.)
+private data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int)
+
+/**
+ * 로또 전체 회차(1회~최신) 과거 당첨 데이터를 실시간으로 받아온다.
+ * 출처: smok95/lotto (GitHub, 커뮤니티가 관리하는 공개 데이터셋). 동행복권 공식 API가 아니므로
+ * 최신 회차 반영이 늦거나 일시적으로 접속이 안 될 수 있다.
+ */
+private suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
+    return withContext(Dispatchers.IO) {
+        val connection = URL("https://smok95.github.io/lotto/results/all.json").openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 15000
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            val jsonArray = JSONArray(text)
+            val result = mutableListOf<HistoricalDraw>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val drawNo = obj.getInt("draw_no")
+                val numsArray = obj.getJSONArray("numbers")
+                val nums = (0 until numsArray.length()).map { numsArray.getInt(it) }
+                val bonus = obj.optInt("bonus_no", -1)
+                result.add(HistoricalDraw(drawNo, nums, bonus))
+            }
+            result
+        } finally {
+            connection.disconnect()
+        }
+    }
+}
+
+/**
+ * 사용자가 고른 번호 6개를, 실제로 존재했던 모든 과거 회차와 하나씩 비교해서
+ * "만약 이 번호로 매 회차 응모했다면 몇 등이 몇 번 나왔을까"를 계산한다.
+ * 몬테카를로(가상 무작위 추첨)와 달리 이건 진짜 있었던 역사적 사실을 기준으로 한다.
+ */
+private fun computeBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>): IntArray {
+    val userMarked = BooleanArray(46)
+    userNumbers.forEach { if (it in 1..45) userMarked[it] = true }
+
+    // index: 0=1등, 1=2등, 2=3등, 3=4등, 4=5등, 5=낙첨
+    val rankCounts = IntArray(6)
+    draws.forEach { draw ->
+        val matches = draw.numbers.count { it in 1..45 && userMarked[it] }
+        val bonusMatched = draw.bonusNo in 1..45 && userMarked[draw.bonusNo]
+        when {
+            matches == 6 -> rankCounts[0]++
+            matches == 5 && bonusMatched -> rankCounts[1]++
+            matches == 5 -> rankCounts[2]++
+            matches == 4 -> rankCounts[3]++
+            matches == 3 -> rankCounts[4]++
+            else -> rankCounts[5]++
+        }
+    }
+    return rankCounts
+}
+
+private val BACKTEST_RANK_LABELS = listOf("1등 (6개 일치)", "2등 (5개+보너스)", "3등 (5개 일치)", "4등 (4개 일치)", "5등 (3개 일치)")
+
+/**
+ * "이 번호로 과거에 실제로 있었던 모든 회차에 응모했다면 어떤 결과였을까?"를 보여주는 백테스트 팝업.
+ * 몬테카를로처럼 가상의 무작위 추첨이 아니라, 실존했던 당첨 회차 데이터를 그대로 사용한다.
+ */
+@Composable
+fun BacktestDialog(
+    numbers: List<Int>,
+    onDismiss: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var historicalDraws by remember { mutableStateOf<List<HistoricalDraw>?>(null) }
+    var backtestResult by remember { mutableStateOf<IntArray?>(null) }
+
+    fun runBacktest() {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            try {
+                val draws = historicalDraws ?: fetchHistoricalDraws().also { historicalDraws = it }
+                backtestResult = computeBacktest(numbers, draws)
+            } catch (e: Exception) {
+                errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { runBacktest() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "과거 회차 백테스트",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    numbers.sorted().forEach { number ->
+                        LottoBall(number = number, size = 26)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "이 번호로 1회부터 지금까지 실제로 있었던 모든 회차에 응모했다면?",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("과거 회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { runBacktest() },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    backtestResult != null -> {
+                        val totalDraws = historicalDraws?.size ?: 0
+                        Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "총 ${"%,d".format(totalDraws)}개 회차 데이터 기준",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BACKTEST_RANK_LABELS.forEachIndexed { index, label ->
+                                val count = backtestResult!![index]
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                                    Text(
+                                        text = if (count > 0) "${count}회" else "0회",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                Text("${backtestResult!![5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
+                                    "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있습니다. " +
+                                    "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /**
  * "이 번호가 이번 회차에 등수별로 당첨될 확률이 얼마나 될까?"를 보여주는 시뮬레이션 팝업.
  * 확률 자체는 어떤 번호를 쓰든 동일하므로, numbers는 화면 상단에 "이 번호" 표시용으로만 쓰인다.
@@ -1369,8 +1644,8 @@ fun SimulationDialog(
     val coroutineScope = rememberCoroutineScope()
     var isSimulating by remember { mutableStateOf(false) }
     var simulationResult by remember { mutableStateOf<IntArray?>(null) }
-    val trialOptions = listOf(100, 1_000, 10_000, 100_000)
-    var selectedTrialIndex by remember { mutableStateOf(2) } // 기본값: 10,000회 (속도/정확도 균형)
+    val trialOptions = listOf(10_000, 50_000, 100_000)
+    var selectedTrialIndex by remember { mutableStateOf(0) } // 기본값: 10,000회 (속도/정확도 균형)
     val trials = trialOptions[selectedTrialIndex]
 
     Dialog(onDismissRequest = onDismiss) {
