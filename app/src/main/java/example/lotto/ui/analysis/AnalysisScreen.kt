@@ -700,6 +700,7 @@ fun ManualPickDialog(
     var saved by remember { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
     var showBacktestDialog by remember { mutableStateOf(false) }
+    var showHotColdDialog by remember { mutableStateOf(false) }
 
     // 번호가 바뀌면 저장 완료 상태는 초기화
     LaunchedEffect(selectedNumbers) {
@@ -756,6 +757,20 @@ fun ManualPickDialog(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
+                    // 핫/콜드 번호 참고 버튼 - 번호 고르기 전에 참고할 수 있도록 맨 위에 배치
+                    OutlinedButton(
+                        onClick = { showHotColdDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                    ) {
+                        Text("🔥 핫/콜드 번호 보기", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     // 초기화 / 자동 채우기 버튼
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -978,6 +993,10 @@ fun ManualPickDialog(
             numbers = sortedSelected,
             onDismiss = { showBacktestDialog = false }
         )
+    }
+
+    if (showHotColdDialog) {
+        HotColdDialog(onDismiss = { showHotColdDialog = false })
     }
 }
 
@@ -1414,12 +1433,20 @@ private suspend fun runMonteCarloSimulation(userNumbers: List<Int>, trials: Int)
 // (동행복권 도메인이 아니라 GitHub Pages라서 API 차단 문제가 없다.)
 private data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int)
 
+// 같은 세션 안에서 백테스트/핫콜드 등 여러 기능이 반복해서 전체 회차를 새로 받아오지 않도록
+// 한 번 받아온 결과를 메모리에 캐시해둔다.
+private object HistoricalDrawCache {
+    var draws: List<HistoricalDraw>? = null
+}
+
 /**
  * 로또 전체 회차(1회~최신) 과거 당첨 데이터를 실시간으로 받아온다.
  * 출처: smok95/lotto (GitHub, 커뮤니티가 관리하는 공개 데이터셋). 동행복권 공식 API가 아니므로
  * 최신 회차 반영이 늦거나 일시적으로 접속이 안 될 수 있다.
  */
 private suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
+    HistoricalDrawCache.draws?.let { return it }
+
     return withContext(Dispatchers.IO) {
         val connection = URL("https://smok95.github.io/lotto/results/all.json").openConnection() as HttpURLConnection
         try {
@@ -1440,6 +1467,175 @@ private suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
             result
         } finally {
             connection.disconnect()
+        }
+    }.also { HistoricalDrawCache.draws = it }
+}
+
+// 번호 1개 + 전체 회차 동안 나온 횟수
+private data class NumberFrequency(val number: Int, val count: Int)
+
+/** 1~45 각 번호가 과거 전체 회차 동안 몇 번 나왔는지 센다. */
+private fun computeNumberFrequencies(draws: List<HistoricalDraw>): List<NumberFrequency> {
+    val counts = IntArray(46)
+    draws.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+    return (1..45).map { NumberFrequency(it, counts[it]) }
+}
+
+/**
+ * 실제 과거 데이터를 기준으로 가장 자주 나온 번호(핫)와 가장 드물게 나온 번호(콜드)를 보여주는 팝업.
+ */
+@Composable
+fun HotColdDialog(onDismiss: () -> Unit) {
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var frequencies by remember { mutableStateOf<List<NumberFrequency>?>(null) }
+    var totalDraws by remember { mutableStateOf(0) }
+
+    fun load() {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            try {
+                val draws = fetchHistoricalDraws()
+                totalDraws = draws.size
+                frequencies = computeNumberFrequencies(draws)
+            } catch (e: Exception) {
+                errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "핫 / 콜드 번호",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "실제 과거 전체 회차 동안 번호별 출현 횟수를 집계한 결과입니다.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFFEF4444))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("과거 회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { load() },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    frequencies != null -> {
+                        Surface(color = Color(0xFFFEF2F2), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "총 ${"%,d".format(totalDraws)}개 회차 기준",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFEF4444),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = "🔥 핫 넘버 TOP 10 (가장 자주 나온 번호)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val hotTop10 = frequencies!!.sortedByDescending { it.count }.take(10)
+                        FrequencyGrid(items = hotTop10, ballColor = Color(0xFFEF4444))
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(text = "❄️ 콜드 넘버 TOP 10 (가장 드물게 나온 번호)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val coldTop10 = frequencies!!.sortedBy { it.count }.take(10)
+                        FrequencyGrid(items = coldTop10, ballColor = Color(0xFF3B82F6))
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "⚠️ 과거에 자주(또는 드물게) 나왔다고 해서 앞으로도 그럴 확률이 높거나 낮은 건 아닙니다. " +
+                                    "로또는 매 회차 완전히 독립적인 무작위 추첨이라, 이전 결과가 다음 결과에 영향을 주지 않습니다. " +
+                                    "이 정보는 순수하게 과거 기록일 뿐입니다.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FrequencyGrid(items: List<NumberFrequency>, ballColor: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items.chunked(5).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                row.forEach { item ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(ballColor, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "${item.number}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(text = "${item.count}회", fontSize = 10.sp, color = Color(0xFF94A3B8))
+                    }
+                }
+                repeat(5 - row.size) { Spacer(modifier = Modifier.size(36.dp)) }
+            }
         }
     }
 }
