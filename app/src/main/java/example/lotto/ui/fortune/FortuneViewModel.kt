@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.random.Random
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 // 카드 1장에 대한 모든 콘텐츠(이름/키워드/풀이/운세점수/별점/행운 요소)를 담는 데이터 클래스.
-// 전부 카드별로 미리 정해둔 고정 콘텐츠라 실시간 데이터 없이도 동작한다 - "오늘의 운세 점수" 등은
-// 실제 확률/통계가 아니라 재미를 위한 콘텐츠 점수임을 화면에서 명확히 표기한다.
 data class TarotCardInfo(
     val name: String,
     val keyword: String,
@@ -62,6 +62,10 @@ class FortuneViewModel @Inject constructor(
 
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
+
+    // [달력 및 출석체크 기능 추가] 날짜별(예: "2026-06-07") 행운 점수(luckScore)를 저장하는 맵 구조
+    private val _attendanceLuckScores = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val attendanceLuckScores: StateFlow<Map<String, Int>> = _attendanceLuckScores.asStateFlow()
 
     // 사용자가 고른 조합 개수(5개/10개). 카드 선택 후에도 바꾸면 번호만 다시 생성한다.
     private var pendingSetCount: Int = 5
@@ -186,7 +190,7 @@ class FortuneViewModel @Inject constructor(
 
     /**
      * "오늘의 카드 뽑기" 버튼 클릭 시(또는 화면 진입 시) 호출.
-     * 카드 3장을 무작위로 뽑아 화면에 보여주고, 이전 선택/결과는 초기화한다.
+     * 카드 3장을 무작위로 뽑아 화면에 보여주고, 이전 선택/결과는 초기화한다[span_2](start_span)[span_2](end_span).
      */
     fun drawTarotCards(setCount: Int) {
         pendingSetCount = setCount
@@ -204,11 +208,11 @@ class FortuneViewModel @Inject constructor(
     /**
      * 3장 중 하나를 클릭했을 때 호출.
      * index를 정확히 받아 선택된 카드만 색이 바뀌도록 하고,
-     * 해당 카드의 전체 콘텐츠(풀이/운세점수/별점/행운요소) + 행운 번호 조합을 새로 생성한다.
-     * 다른 카드를 다시 클릭하면 몇 번이든 선택을 바꿀 수 있다(재선택 허용).
+     * 해당 카드의 전체 콘텐츠(풀이/운세점수/별점/행운요소) + 행운 번호 조합을 새로 생성한다[span_3](start_span)[span_3](end_span).
+     * 다른 카드를 다시 클릭하면 몇 번이든 선택을 바꿀 수 있다(재선택 허용)[span_4](start_span)[span_4](end_span).
      */
     fun selectTarotCard(index: Int) {
-        // 아직 카드를 뽑지 않았다면(카드 후보가 없다면) 새로 뽑아서 채워준다
+        // 아직 카드를 뽑지 않았다면(카드 후보가 없다면) 새로 뽑아서 채워준다[span_5](start_span)[span_5](end_span)
         if (_tarotCardOptions.value.isEmpty()) {
             _tarotCardOptions.value = tarotDeck.shuffled().take(3)
         }
@@ -225,12 +229,25 @@ class FortuneViewModel @Inject constructor(
         _tarotMeaningPositive.value = selectedCard.positiveMeaning
         _tarotMeaningNegative.value = selectedCard.negativeMeaning
 
+        // [출석체크/달력 연동] 카드를 최종 선택하는 순간 오늘 날짜에 운세 점수 기록
+        recordTodayAttendanceScore(selectedCard.luckScore)
+
         regenerateLuckyNumbers()
     }
 
     /**
+     * 오늘 날짜 기준으로 달력 출석체크 점수 저장 (YYYY-MM-DD 형식)
+     */
+    private fun recordTodayAttendanceScore(score: Int) {
+        val todayKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val currentMap = _attendanceLuckScores.value.toMutableMap()
+        currentMap[todayKey] = score
+        _attendanceLuckScores.value = currentMap
+    }
+
+    /**
      * 5개/10개 조합 개수를 바꿀 때 호출. 카드를 이미 선택한 상태라면 번호만 즉시 다시 생성하고,
-     * 아직 카드를 선택하지 않았다면 다음 선택 시 반영될 개수만 기억해둔다.
+     * 아직 카드를 선택하지 않았다면 다음 선택 시 반영될 개수만 기억해둔다[span_6](start_span)[span_6](end_span).
      */
     fun updateSetCount(setCount: Int) {
         pendingSetCount = setCount
@@ -243,19 +260,19 @@ class FortuneViewModel @Inject constructor(
         val sets = mutableListOf<List<Int>>()
         val seed = System.currentTimeMillis()
         
-        // 선택된 카드의 행운 번호 확인 (1~45 범위 내일 때만 사용)
+        // 선택된 카드의 행운 번호 확인 (1~45 범위 내일 때만 사용)[span_7](start_span)[span_7](end_span)
         val cardLuckyNumber = _selectedCardInfo.value?.luckyNumber ?: 0
 
         for (i in 0 until pendingSetCount) {
             val setRandom = Random(seed + i * 99)
             val resultSet = mutableSetOf<Int>()
 
-            // 첫 번째와 두 번째 게임(인덱스 0, 1)에만 타로 행운 번호를 강제 포함시킴
+            // 첫 번째와 두 번째 게임(인덱스 0, 1)에만 타로 행운 번호를 강제 포함시킴[span_8](start_span)[span_8](end_span)
             if (i < 2 && cardLuckyNumber in 1..45) {
                 resultSet.add(cardLuckyNumber)
             }
 
-            // 나머지 빈 자리를 1~45 사이의 랜덤 숫자로 채움 (나머지 게임은 완전 랜덤)
+            // 나머지 빈 자리를 1~45 사이의 랜덤 숫자로 채움 (나머지 게임은 완전 랜덤)[span_9](start_span)[span_9](end_span)
             while (resultSet.size < 6) {
                 resultSet.add(setRandom.nextInt(1, 46))
             }
