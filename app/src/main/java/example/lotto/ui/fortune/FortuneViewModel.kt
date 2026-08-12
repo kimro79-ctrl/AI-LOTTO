@@ -243,19 +243,19 @@ class FortuneViewModel @Inject constructor(
         val sets = mutableListOf<List<Int>>()
         val seed = System.currentTimeMillis()
         
-        // 선택된 카드의 행운 번호 확인 (1~45 범위 내일 때만 로또 번호에 강제 포함)
+        // 선택된 카드의 행운 번호 확인 (1~45 범위 내일 때만 사용)
         val cardLuckyNumber = _selectedCardInfo.value?.luckyNumber ?: 0
 
         for (i in 0 until pendingSetCount) {
             val setRandom = Random(seed + i * 99)
             val resultSet = mutableSetOf<Int>()
 
-            // 1. 타로 행운 번호가 로또 범위(1~45)에 포함되면 우선적으로 추가
-            if (cardLuckyNumber in 1..45) {
+            // 첫 번째와 두 번째 게임(인덱스 0, 1)에만 타로 행운 번호를 강제 포함시킴
+            if (i < 2 && cardLuckyNumber in 1..45) {
                 resultSet.add(cardLuckyNumber)
             }
 
-            // 2. 남은 자리를 1~45 사이의 랜덤 숫자로 채움
+            // 나머지 빈 자리를 1~45 사이의 랜덤 숫자로 채움 (나머지 게임은 완전 랜덤)
             while (resultSet.size < 6) {
                 resultSet.add(setRandom.nextInt(1, 46))
             }
