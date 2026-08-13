@@ -39,6 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FortuneScreen(
@@ -59,6 +60,7 @@ fun FortuneScreen(
     val saveMessage by viewModel.saveMessage.collectAsState()
     val hasDrawnToday by viewModel.hasDrawnToday.collectAsState()
     val checkInHistory by viewModel.checkInHistory.collectAsState()
+
     val context = LocalContext.current
     val hasSelected = selectedCardIndex != null
 
@@ -96,11 +98,10 @@ fun FortuneScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // ⓪ 운세 달력 (출석체크 스타일)
             item {
                 FortuneCalendarSection(checkInHistory = checkInHistory)
             }
-            // ① 카드 선택 카드
+
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -125,7 +126,6 @@ fun FortuneScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         if (hasDrawnToday) {
-                            // 1일 1회 제한 안내 - 오늘은 이미 확인했으므로 카드 선택 UI 대신 안내만 표시
                             Surface(
                                 color = Color(0xFFF3E8FF),
                                 shape = RoundedCornerShape(14.dp),
@@ -162,6 +162,7 @@ fun FortuneScreen(
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
+
                             Button(
                                 onClick = {
                                     coroutineScope.launch {
@@ -189,7 +190,6 @@ fun FortuneScreen(
                 }
             }
 
-            // ② 오늘의 카드 공개
             if (hasSelected && tarotCardName != null) {
                 item {
                     AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically()) {
@@ -224,7 +224,6 @@ fun FortuneScreen(
                     }
                 }
 
-                // ③ 오늘의 운세 점수 + 긍정/주의
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -266,7 +265,7 @@ fun FortuneScreen(
                         }
                     }
                 }
-                // ④ 오늘의 행운 (별점 + 행운 요소)
+
                 item {
                     selectedCardInfo?.let { info ->
                         Card(
@@ -299,7 +298,6 @@ fun FortuneScreen(
                     }
                 }
 
-                // ⑤ 행운번호 - 개수 선택 + 조합 + 저장
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -397,7 +395,6 @@ fun FortuneScreen(
     }
 }
 
-/** "카드 섞는 중" 애니메이션. 회전하는 🔀 이모지 + 안내 문구로 간단하게 표현한다. */
 @Composable
 fun ShufflingIndicator() {
     val infiniteTransition = rememberInfiniteTransition(label = "shuffle")
@@ -447,11 +444,6 @@ fun LuckyInfoChip(title: String, value: String) {
     }
 }
 
-/**
- * 카드 뒷면 컴포넌트. 신비로운 별 패턴 느낌을 살리기 위해 그라데이션 배경 + 별 장식을 넣었다.
- * isSelected가 true인 카드만 골드색으로 하이라이트된다.
- * isLocked가 true(이미 한 장을 선택한 상태)이면 클릭이 아예 먹히지 않는다.
- */
 @Composable
 fun CardBackItem(isSelected: Boolean, isLocked: Boolean, onClick: () -> Unit) {
     val backgroundBrush = when {
@@ -498,11 +490,8 @@ fun TarotBallItem(number: Int, size: Int) {
     }
 }
 
-// ───────────────────────── 운세 달력(출석체크) ─────────────────────────
-
 private val calendarDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-/** 달력에 표시할 연/월을 담는 값 객체. month는 1~12. */
 private data class YearMonth(val year: Int, val month: Int) {
     fun next(): YearMonth = if (month == 12) YearMonth(year + 1, 1) else YearMonth(year, month + 1)
     fun prev(): YearMonth = if (month == 1) YearMonth(year - 1, 12) else YearMonth(year, month - 1)
@@ -519,10 +508,6 @@ private fun dayKey(year: Int, month: Int, day: Int): String {
     return calendarDateFormat.format(cal.time)
 }
 
-/**
- * 이번 달 출석 기록을 보여주는 달력 카드. 카드를 뽑은 날짜는 색이 채워지고 운세 점수가 작게 표시된다.
- * 이전/다음 달로 넘겨서 지난 기록도 확인할 수 있다.
- */
 @Composable
 fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
     var yearMonth by remember { mutableStateOf(currentYearMonth()) }
@@ -559,7 +544,7 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            // 요일 헤더
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 listOf("일", "월", "화", "수", "목", "금", "토").forEach { d ->
                     Text(
@@ -576,7 +561,7 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
 
             val cal = Calendar.getInstance()
             cal.set(yearMonth.year, yearMonth.month - 1, 1)
-            val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=일요일
+            val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1
             val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
             val totalCells = firstDayOfWeek + daysInMonth
@@ -600,6 +585,7 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
                     }
                 }
             }
+
             Spacer(modifier = Modifier.height(10.dp))
             Text(text = "🔮 카드를 뽑은 날은 운세 점수가 표시돼요", fontSize = 10.sp, color = Color(0xFF94A3B8))
         }
