@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,6 +48,7 @@ fun FortuneScreen(
 ) {
     var selectedSetCount by remember { mutableStateOf(5) }
     var isShuffling by remember { mutableStateOf(false) }
+    var showDetailDialog by remember { mutableStateOf(false) } // 상세 팝업 제어 상태
     val coroutineScope = rememberCoroutineScope()
 
     val tarotCardName by viewModel.tarotCardName.collectAsState()
@@ -68,6 +70,100 @@ fun FortuneScreen(
         saveMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             viewModel.clearSaveMessage()
+        }
+    }
+
+    // 상세 해석 팝업창
+    if (showDetailDialog && selectedCardInfo != null) {
+        val info = selectedCardInfo!!
+        Dialog(onDismissRequest = { showDetailDialog = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "📜 타로 카드 상세 해석", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = info.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A), textAlign = TextAlign.Center)
+                    Text(text = info.keyword, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF7C3AED))
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color(0xFFF1F5F9))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF8FAFC), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(text = "💡 종합 운세", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                        Text(text = info.overallFortune, fontSize = 12.sp, color = Color(0xFF334155), lineHeight = 18.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF0FDF4), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "🌞 긍정적 흐름", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Text(text = info.positiveFlow, fontSize = 12.sp, color = Color(0xFF334155), lineHeight = 18.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFFEF2F2), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "🌧️ 주의 포인트", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Text(text = info.cautionPoint, fontSize = 12.sp, color = Color(0xFF334155), lineHeight = 18.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF8FAFC), RoundedCornerShape(14.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "💬 오늘의 조언", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                        Text(text = info.todaysAdvice, fontSize = 12.sp, color = Color(0xFF334155), lineHeight = 18.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = { showDetailDialog = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                    ) {
+                        Text(text = "확인 완료", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
         }
     }
 
@@ -193,32 +289,51 @@ fun FortuneScreen(
             if (hasSelected && tarotCardName != null) {
                 item {
                     AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically()) {
+                        // 사진과 같은 컴팩트한 카드 영역 (클릭 시 상세 팝업 노출)
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDetailDialog = true },
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(18.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "🃏 오늘의 카드", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = tarotCardName ?: "",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A),
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = tarotKeyword ?: "",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF7C3AED)
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "🃏 오늘의 카드", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = tarotCardName ?: "",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = tarotKeyword ?: "",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF7C3AED)
+                                    )
+                                }
+                                Surface(
+                                    color = Color(0xFFF3E8FF),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text(
+                                        text = "상세보기 ❯",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF7C3AED)
+                                    )
+                                }
                             }
                         }
                     }
