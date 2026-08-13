@@ -60,6 +60,7 @@ fun FortuneScreen(
     val saveMessage by viewModel.saveMessage.collectAsState()
     val hasDrawnToday by viewModel.hasDrawnToday.collectAsState()
     val checkInHistory by viewModel.checkInHistory.collectAsState()
+    val luckyNumbers by viewModel.luckyNumbers.collectAsState()
 
     val context = LocalContext.current
     val hasSelected = selectedCardIndex != null
@@ -81,15 +82,23 @@ fun FortuneScreen(
                         fontWeight = FontWeight.Bold,
                         style = TextStyle(
                             fontSize = 22.sp,
-                            brush = Brush.horizontalGradient(colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF0EA5E9),
+                                    Color(0xFF7C3AED)
+                                )
+                            )
                         )
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8FAFC))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFF8FAFC)
+                )
             )
         },
         containerColor = Color(0xFFF1F5F9)
     ) { paddingValues ->
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -98,48 +107,90 @@ fun FortuneScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // ⓪ 운세 달력 (출석체크 스타일)
+
+            // =========================================================
+            // ① 운세 달력 박스
+            // =========================================================
             item {
-                FortuneCalendarSection(checkInHistory = checkInHistory)
+                FortuneCalendarSection(
+                    checkInHistory = checkInHistory
+                )
             }
 
-            // ① 카드 선택 카드
+            // =========================================================
+            // ② 오늘의 운세 박스
+            // =========================================================
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 1.dp
+                    )
                 ) {
+
                     Column(
-                        modifier = Modifier.padding(18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(18.dp)
                     ) {
-                        Text(text = "🔮", fontSize = 26.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "오늘 당신에게 필요한 메시지를\n카드 한 장으로 확인해보세요",
-                            fontSize = 13.sp,
-                            color = Color(0xFF64748B),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 18.sp
-                        )
+
+                        // -------------------------------------------------
+                        // 박스 제목
+                        // -------------------------------------------------
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🔮",
+                                fontSize = 24.sp
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Column {
+                                Text(
+                                    text = "오늘의 타로 운세",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+
+                                Text(
+                                    text = "오늘 당신에게 필요한 메시지를 카드로 확인해보세요",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        // -------------------------------------------------
+                        // 카드 선택 영역
+                        // -------------------------------------------------
                         if (hasDrawnToday) {
-                            // 1일 1회 제한 안내 - 오늘은 이미 확인했으므로 카드 선택 UI 대신 안내만 표시
+
                             Surface(
                                 color = Color(0xFFF3E8FF),
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(vertical = 14.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.padding(
+                                        vertical = 14.dp
+                                    ),
+                                    horizontalArrangement =
+                                        Arrangement.Center,
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
                                 ) {
-                                    Text(text = "✅ ", fontSize = 15.sp)
+                                    Text(
+                                        text = "✅ ",
+                                        fontSize = 15.sp
+                                    )
+
                                     Text(
                                         text = "오늘의 타로를 이미 확인했어요. 내일 다시 만나요!",
                                         fontSize = 12.sp,
@@ -148,18 +199,28 @@ fun FortuneScreen(
                                     )
                                 }
                             }
+
                         } else if (isShuffling) {
+
                             ShufflingIndicator()
+
                         } else {
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                horizontalArrangement =
+                                    Arrangement.SpaceEvenly
                             ) {
                                 tarotCardOptions.forEachIndexed { index, _ ->
+
                                     CardBackItem(
-                                        isSelected = selectedCardIndex == index,
-                                        isLocked = hasSelected,
-                                        onClick = { viewModel.selectTarotCard(index) }
+                                        isSelected =
+                                            selectedCardIndex == index,
+                                        isLocked =
+                                            hasSelected,
+                                        onClick = {
+                                            viewModel.selectTarotCard(index)
+                                        }
                                     )
                                 }
                             }
@@ -171,7 +232,11 @@ fun FortuneScreen(
                                     coroutineScope.launch {
                                         isShuffling = true
                                         delay(650)
-                                        viewModel.drawTarotCards(selectedSetCount)
+
+                                        viewModel.drawTarotCards(
+                                            selectedSetCount
+                                        )
+
                                         isShuffling = false
                                     }
                                 },
@@ -179,222 +244,506 @@ fun FortuneScreen(
                                     .fillMaxWidth()
                                     .height(46.dp),
                                 shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        Color(0xFF7C3AED)
+                                )
                             ) {
                                 Text(
-                                    text = if (hasSelected) "🔀 카드 섞고 다시 뽑기" else "🔀 카드 섞고 뽑기",
+                                    text = if (hasSelected)
+                                        "🔀 카드 섞고 다시 뽑기"
+                                    else
+                                        "🔀 카드 섞고 뽑기",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             }
                         }
+
+                        // -------------------------------------------------
+                        // 카드 결과
+                        // -------------------------------------------------
+                        if (hasSelected && tarotCardName != null) {
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            HorizontalDivider(
+                                color = Color(0xFFF1F5F9)
+                            )
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = fadeIn() + expandVertically()
+                            ) {
+
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment =
+                                        Alignment.CenterHorizontally
+                                ) {
+
+                                    Text(
+                                        text = "🃏 오늘의 카드",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF94A3B8)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text(
+                                        text = tarotCardName ?: "",
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A),
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Text(
+                                        text = tarotKeyword ?: "",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF7C3AED)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            // =================================================
+                            // 운세 점수
+                            // =================================================
+                            selectedCardInfo?.let { info ->
+
+                                val scoreColor =
+                                    fortuneScoreColor(info.luckScore)
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.SpaceBetween,
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
+                                ) {
+
+                                    Text(
+                                        text = "⭐ 오늘의 운세 점수",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0F172A)
+                                    )
+
+                                    Text(
+                                        text = "${info.luckScore}점",
+                                        fontSize = 19.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = scoreColor
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Surface(
+                                    color = scoreColor.copy(
+                                        alpha = 0.08f
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = fortuneScoreMessage(
+                                            info.luckScore
+                                        ),
+                                        modifier = Modifier.padding(12.dp),
+                                        fontSize = 11.sp,
+                                        color = scoreColor,
+                                        fontWeight = FontWeight.SemiBold,
+                                        lineHeight = 17.sp
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // =================================================
+                                // 긍정 풀이
+                                // =================================================
+                                TarotMeaningBlock(
+                                    title = "🌞 긍정적인 흐름",
+                                    text =
+                                        tarotMeaningPositive ?: "",
+                                    titleColor =
+                                        Color(0xFF10B981),
+                                    backgroundColor =
+                                        Color(0xFFECFDF5)
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // =================================================
+                                // 부정 / 주의 풀이
+                                // =================================================
+                                TarotMeaningBlock(
+                                    title = "🌧️ 주의해야 할 흐름",
+                                    text =
+                                        tarotMeaningNegative ?: "",
+                                    titleColor =
+                                        Color(0xFFEF4444),
+                                    backgroundColor =
+                                        Color(0xFFFEF2F2)
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text =
+                                        "※ 재미를 위한 콘텐츠이며 실제 확률과는 무관합니다.",
+                                    fontSize = 9.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                HorizontalDivider(
+                                    color = Color(0xFFF1F5F9)
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // =================================================
+                                // 오늘의 행운
+                                // =================================================
+                                Text(
+                                    text = "🍀 오늘의 행운",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                StarRatingRow(
+                                    label = "재물운",
+                                    stars = info.wealthStars
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                StarRatingRow(
+                                    label = "애정운",
+                                    stars = info.loveStars
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                StarRatingRow(
+                                    label = "대인관계",
+                                    stars = info.relationshipStars
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.SpaceBetween
+                                ) {
+
+                                    LuckyInfoChip(
+                                        title = "행운의 색상",
+                                        value = info.luckyColor
+                                    )
+
+                                    LuckyInfoChip(
+                                        title = "행운의 숫자",
+                                        value =
+                                            luckyNumbers.joinToString(
+                                                " · "
+                                            )
+                                    )
+
+                                    LuckyInfoChip(
+                                        title = "행운의 방향",
+                                        value = info.luckyDirection
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                // =================================================
+                                // 행운번호 3개
+                                // =================================================
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color(0xFFF8FAFC),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+
+                                    Column(
+                                        modifier = Modifier.padding(14.dp),
+                                        horizontalAlignment =
+                                            Alignment.CenterHorizontally
+                                    ) {
+
+                                        Text(
+                                            text = "☘ 오늘의 행운번호",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.height(10.dp)
+                                        )
+
+                                        Row(
+                                            horizontalArrangement =
+                                                Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            luckyNumbers.forEach {
+                                                number ->
+                                                TarotBallItem(
+                                                    number = number,
+                                                    size = 38
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.height(8.dp)
+                                        )
+
+                                        Text(
+                                            text =
+                                                "추천 조합 중 2세트에 행운번호가 반영됩니다.",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+                                // =================================================
+                                // 로또 조합
+                                // =================================================
+                                Text(
+                                    text = "🎯 타로 행운번호 조합",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text =
+                                        "${tarotKeyword ?: ""}의 기운을 담아 구성한 오늘의 조합입니다",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 5개 / 10개
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(10.dp)
+                                ) {
+
+                                    listOf(5, 10).forEach { count ->
+
+                                        val isSelected =
+                                            selectedSetCount == count
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                selectedSetCount = count
+                                                viewModel.updateSetCount(
+                                                    count
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors =
+                                                ButtonDefaults
+                                                    .outlinedButtonColors(
+                                                        containerColor =
+                                                            if (isSelected)
+                                                                Color(0xFFE0F2FE)
+                                                            else
+                                                                Color.Transparent,
+                                                        contentColor =
+                                                            if (isSelected)
+                                                                Color(0xFF0284C7)
+                                                            else
+                                                                Color(0xFF64748B)
+                                                    ),
+                                            border =
+                                                ButtonDefaults
+                                                    .outlinedButtonBorder
+                                                    .copy(
+                                                        brush =
+                                                            Brush.horizontalGradient(
+                                                                listOf(
+                                                                    if (isSelected)
+                                                                        Color(0xFF0284C7)
+                                                                    else
+                                                                        Color(0xFFCBD5E1),
+                                                                    if (isSelected)
+                                                                        Color(0xFF0284C7)
+                                                                    else
+                                                                        Color(0xFFCBD5E1)
+                                                                )
+                                                            )
+                                                    )
+                                        ) {
+
+                                            Text(
+                                                text = "${count}개 조합",
+                                                fontSize = 13.sp,
+                                                fontWeight =
+                                                    if (isSelected)
+                                                        FontWeight.Bold
+                                                    else
+                                                        FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // =================================================
+                                // 조합 표시
+                                // =================================================
+                                Column(
+                                    verticalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+
+                                    generatedTarotSets.forEachIndexed {
+                                            index,
+                                            numbers ->
+
+                                        val hasLucky =
+                                            numbers.any {
+                                                it in luckyNumbers
+                                            }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    if (hasLucky)
+                                                        Color(0xFFF0FDF4)
+                                                    else
+                                                        Color(0xFFF8FAFC),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .padding(
+                                                    horizontal = 12.dp,
+                                                    vertical = 10.dp
+                                                ),
+                                            verticalAlignment =
+                                                Alignment.CenterVertically
+                                        ) {
+
+                                            Text(
+                                                text = "${index + 1}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF94A3B8),
+                                                modifier =
+                                                    Modifier.width(20.dp)
+                                            )
+
+                                            Spacer(
+                                                modifier =
+                                                    Modifier.width(4.dp)
+                                            )
+
+                                            Row(
+                                                modifier =
+                                                    Modifier.weight(1f),
+                                                horizontalArrangement =
+                                                    Arrangement.SpaceBetween
+                                            ) {
+                                                numbers.forEach { num ->
+                                                    TarotBallItem(
+                                                        number = num,
+                                                        size = 30
+                                                    )
+                                                }
+                                            }
+
+                                            if (hasLucky) {
+                                                Spacer(
+                                                    modifier =
+                                                        Modifier.width(5.dp)
+                                                )
+
+                                                Text(
+                                                    text = "☘",
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // =================================================
+                                // 저장
+                                // =================================================
+                                Button(
+                                    onClick = {
+                                        viewModel.saveAllTarotNumbers()
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(46.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor =
+                                            Color(0xFF10B981)
+                                    )
+                                ) {
+                                    Text(
+                                        text = "🍀 행운번호 저장하기",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            // ② 오늘의 카드 공개
-            if (hasSelected && tarotCardName != null) {
-                item {
-                    AnimatedVisibility(visible = true, enter = fadeIn() + expandVertically()) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(text = "🃏 오늘의 카드", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = tarotCardName ?: "",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0F172A),
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = tarotKeyword ?: "",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF7C3AED)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // ③ 오늘의 운세 점수 + 긍정/주의
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = "⭐ 오늘의 운세 점수", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                                Text(
-                                    text = "${selectedCardInfo?.luckScore ?: 0}점",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF7C3AED)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Row(verticalAlignment = Alignment.Top) {
-                                Text(text = "🌞 긍정  ", fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontSize = 13.sp)
-                                Text(text = tarotMeaningPositive ?: "", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF334155))
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(verticalAlignment = Alignment.Top) {
-                                Text(text = "🌧️ 주의  ", fontWeight = FontWeight.Bold, color = Color(0xFFEF4444), fontSize = 13.sp)
-                                Text(text = tarotMeaningNegative ?: "", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF334155))
-                            }
-
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "※ 재미를 위한 콘텐츠 점수이며 실제 확률과 무관합니다", fontSize = 9.sp, color = Color(0xFFCBD5E1))
-                        }
-                    }
-                }
-
-                // ④ 오늘의 행운 (별점 + 행운 요소)
-                item {
-                    selectedCardInfo?.let { info ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Text(text = "🍀 오늘의 행운", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                StarRatingRow(label = "재물운", stars = info.wealthStars)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                StarRatingRow(label = "애정운", stars = info.loveStars)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                StarRatingRow(label = "대인관계", stars = info.relationshipStars)
-
-                                Spacer(modifier = Modifier.height(14.dp))
-                                HorizontalDivider(color = Color(0xFFF1F5F9))
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    LuckyInfoChip(title = "행운의 색상", value = info.luckyColor)
-                                    LuckyInfoChip(title = "행운의 숫자", value = "${info.luckyNumber}")
-                                    LuckyInfoChip(title = "행운의 방향", value = info.luckyDirection)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ⑤ 행운번호 - 개수 선택 + 조합 + 저장
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text(text = "🎯 타로 행운번호", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "${tarotKeyword ?: ""}의 기운을 담아 구성한 오늘의 조합입니다", fontSize = 11.sp, color = Color(0xFF94A3B8))
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                listOf(5, 10).forEach { count ->
-                                    val isSelected = selectedSetCount == count
-                                    OutlinedButton(
-                                        onClick = {
-                                            selectedSetCount = count
-                                            viewModel.updateSetCount(count)
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = if (isSelected) Color(0xFFE0F2FE) else Color.Transparent,
-                                            contentColor = if (isSelected) Color(0xFF0284C7) else Color(0xFF64748B)
-                                        ),
-                                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                                            brush = Brush.horizontalGradient(
-                                                listOf(
-                                                    if (isSelected) Color(0xFF0284C7) else Color(0xFFCBD5E1),
-                                                    if (isSelected) Color(0xFF0284C7) else Color(0xFFCBD5E1)
-                                                )
-                                            )
-                                        )
-                                    ) {
-                                        Text(text = "${count}개 조합", fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                generatedTarotSets.forEachIndexed { index, numbers ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${index + 1}",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF94A3B8),
-                                            modifier = Modifier.width(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            numbers.forEach { num -> TarotBallItem(number = num, size = 30) }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Button(
-                                onClick = { viewModel.saveAllTarotNumbers() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
-                            ) {
-                                Text(text = "🍀 행운번호 저장하기", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
-                }
-            } else if (!hasDrawnToday) {
+            if (!hasSelected && !hasDrawnToday) {
                 item {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "카드를 선택하면 오늘의 운세가 펼쳐져요", color = Color(0xFF94A3B8), fontSize = 13.sp)
+                        Text(
+                            text =
+                                "카드를 선택하면 오늘의 운세가 펼쳐져요",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }
@@ -402,14 +751,94 @@ fun FortuneScreen(
     }
 }
 
-/** "카드 섞는 중" 애니메이션. 회전하는 🔀 이모지 + 안내 문구로 간단하게 표현한다. */
+/* ============================================================
+   점수 컬러
+   80~100 = 파랑
+   60~79  = 노랑
+   0~59   = 빨강
+   ============================================================ */
+
+private fun fortuneScoreColor(score: Int): Color {
+    return when {
+        score >= 80 -> Color(0xFF2563EB)
+        score >= 60 -> Color(0xFFEAB308)
+        else -> Color(0xFFEF4444)
+    }
+}
+
+private fun fortuneScoreMessage(score: Int): String {
+    return when {
+        score >= 80 ->
+            "오늘은 전반적인 흐름이 좋은 편입니다. 기회를 적극적으로 활용하되 마지막까지 집중력을 유지하면 좋습니다."
+
+        score >= 60 ->
+            "무난한 흐름의 하루입니다. 지나치게 서두르기보다 상황을 살피면서 움직이는 것이 좋습니다."
+
+        else ->
+            "오늘은 신중함이 필요한 흐름입니다. 중요한 결정은 한 번 더 확인하고 충동적인 선택은 피하는 것이 좋습니다."
+    }
+}
+
+/* ============================================================
+   긍정 / 주의 상세 풀이
+   ============================================================ */
+
+@Composable
+private fun TarotMeaningBlock(
+    title: String,
+    text: String,
+    titleColor: Color,
+    backgroundColor: Color
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = backgroundColor,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+
+            Text(
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = titleColor
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = text,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF334155),
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+/* ============================================================
+   카드 섞기 애니메이션
+   ============================================================ */
+
 @Composable
 fun ShufflingIndicator() {
-    val infiniteTransition = rememberInfiniteTransition(label = "shuffle")
+
+    val infiniteTransition =
+        rememberInfiniteTransition(label = "shuffle")
+
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(animation = tween(600, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                600,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
         label = "shuffleRotation"
     )
 
@@ -417,159 +846,404 @@ fun ShufflingIndicator() {
         modifier = Modifier.padding(vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "🔀", fontSize = 32.sp, modifier = Modifier.rotate(rotation))
+
+        Text(
+            text = "🔀",
+            fontSize = 32.sp,
+            modifier = Modifier.rotate(rotation)
+        )
+
         Spacer(modifier = Modifier.height(10.dp))
-        Text(text = "카드를 섞고 있어요...", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+
+        Text(
+            text = "카드를 섞고 있어요...",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF7C3AED)
+        )
     }
 }
 
+/* ============================================================
+   별점
+   ============================================================ */
+
 @Composable
-fun StarRatingRow(label: String, stars: Int) {
+fun StarRatingRow(
+    label: String,
+    stars: Int
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
+
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF334155)
+        )
+
         Row {
             repeat(5) { i ->
                 Text(
-                    text = if (i < stars) "★" else "☆",
+                    text =
+                        if (i < stars) "★" else "☆",
                     fontSize = 15.sp,
-                    color = if (i < stars) Color(0xFFFACC15) else Color(0xFFE2E8F0)
+                    color =
+                        if (i < stars)
+                            Color(0xFFFACC15)
+                        else
+                            Color(0xFFE2E8F0)
                 )
             }
         }
     }
 }
 
+/* ============================================================
+   행운 정보
+   ============================================================ */
+
 @Composable
-fun LuckyInfoChip(title: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = title, fontSize = 10.sp, color = Color(0xFF94A3B8))
+fun LuckyInfoChip(
+    title: String,
+    value: String
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Text(
+            text = title,
+            fontSize = 10.sp,
+            color = Color(0xFF94A3B8)
+        )
+
         Spacer(modifier = Modifier.height(2.dp))
-        Text(text = value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF7C3AED),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
-/**
- * 카드 뒷면 컴포넌트. 신비로운 별 패턴 느낌을 살리기 위해 그라데이션 배경 + 별 장식을 넣었다.
- * isSelected가 true인 카드만 골드색으로 하이라이트된다.
- * isLocked가 true(이미 한 장을 선택한 상태)이면 클릭이 아예 먹히지 않는다.
- */
+/* ============================================================
+   타로 카드 뒷면
+   ============================================================ */
+
 @Composable
-fun CardBackItem(isSelected: Boolean, isLocked: Boolean, onClick: () -> Unit) {
-    val backgroundBrush = when {
-        isSelected -> Brush.verticalGradient(listOf(Color(0xFFFACC15), Color(0xFFF59E0B)))
-        isLocked -> Brush.verticalGradient(listOf(Color(0xFF7C3AED).copy(alpha = 0.3f), Color(0xFF0EA5E9).copy(alpha = 0.3f)))
-        else -> Brush.verticalGradient(listOf(Color(0xFF7C3AED), Color(0xFF4C1D95)))
-    }
+fun CardBackItem(
+    isSelected: Boolean,
+    isLocked: Boolean,
+    onClick: () -> Unit
+) {
+
+    val backgroundBrush =
+        when {
+            isSelected ->
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFFACC15),
+                        Color(0xFFF59E0B)
+                    )
+                )
+
+            isLocked ->
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF7C3AED)
+                            .copy(alpha = 0.3f),
+                        Color(0xFF0EA5E9)
+                            .copy(alpha = 0.3f)
+                    )
+                )
+
+            else ->
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF7C3AED),
+                        Color(0xFF4C1D95)
+                    )
+                )
+        }
 
     Box(
         modifier = Modifier
-            .size(width = 95.dp, height = 140.dp)
+            .size(
+                width = 95.dp,
+                height = 140.dp
+            )
             .clip(RoundedCornerShape(14.dp))
             .background(backgroundBrush)
-            .clickable(enabled = !isLocked) { onClick() },
+            .clickable(enabled = !isLocked) {
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "✦", fontSize = 14.sp, color = if (isSelected) Color(0xFF3F2D00) else Color.White.copy(alpha = 0.5f))
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Text(
+                text = "✦",
+                fontSize = 14.sp,
+                color =
+                    if (isSelected)
+                        Color(0xFF3F2D00)
+                    else
+                        Color.White.copy(alpha = 0.5f)
+            )
+
             Spacer(modifier = Modifier.height(6.dp))
-            Text(text = "🔮", fontSize = 26.sp)
+
+            Text(
+                text = "🔮",
+                fontSize = 26.sp
+            )
+
             Spacer(modifier = Modifier.height(6.dp))
-            Text(text = "✦", fontSize = 14.sp, color = if (isSelected) Color(0xFF3F2D00) else Color.White.copy(alpha = 0.5f))
+
+            Text(
+                text = "✦",
+                fontSize = 14.sp,
+                color =
+                    if (isSelected)
+                        Color(0xFF3F2D00)
+                    else
+                        Color.White.copy(alpha = 0.5f)
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "TAROT", color = if (isSelected) Color(0xFF3F2D00) else Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+
+            Text(
+                text = "TAROT",
+                color =
+                    if (isSelected)
+                        Color(0xFF3F2D00)
+                    else
+                        Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
         }
     }
 }
 
+/* ============================================================
+   로또 공
+   ============================================================ */
+
 @Composable
-fun TarotBallItem(number: Int, size: Int) {
-    val ballColor = when (number) {
-        in 1..10 -> Color(0xFFF59E0B)
-        in 11..20 -> Color(0xFF3B82F6)
-        in 21..30 -> Color(0xFFEF4444)
-        in 31..40 -> Color(0xFF64748B)
-        else -> Color(0xFF10B981)
-    }
+fun TarotBallItem(
+    number: Int,
+    size: Int
+) {
+
+    val ballColor =
+        when (number) {
+            in 1..10 -> Color(0xFFF59E0B)
+            in 11..20 -> Color(0xFF3B82F6)
+            in 21..30 -> Color(0xFFEF4444)
+            in 31..40 -> Color(0xFF64748B)
+            else -> Color(0xFF10B981)
+        }
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(size.dp).background(color = ballColor, shape = CircleShape)
+        modifier = Modifier
+            .size(size.dp)
+            .background(
+                color = ballColor,
+                shape = CircleShape
+            )
     ) {
-        Text(text = number.toString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size * 0.38).sp)
+
+        Text(
+            text = number.toString(),
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = (size * 0.38).sp
+        )
     }
 }
 
-// ───────────────────────── 운세 달력(출석체크) ─────────────────────────
+/* ============================================================
+   운세 달력
+   ============================================================ */
 
-private val calendarDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+private val calendarDateFormat =
+    SimpleDateFormat(
+        "yyyy-MM-dd",
+        Locale.getDefault()
+    )
 
-/** 달력에 표시할 연/월을 담는 값 객체. month는 1~12. */
-private data class YearMonth(val year: Int, val month: Int) {
-    fun next(): YearMonth = if (month == 12) YearMonth(year + 1, 1) else YearMonth(year, month + 1)
-    fun prev(): YearMonth = if (month == 1) YearMonth(year - 1, 12) else YearMonth(year, month - 1)
+private data class YearMonth(
+    val year: Int,
+    val month: Int
+) {
+
+    fun next(): YearMonth =
+        if (month == 12)
+            YearMonth(year + 1, 1)
+        else
+            YearMonth(year, month + 1)
+
+    fun prev(): YearMonth =
+        if (month == 1)
+            YearMonth(year - 1, 12)
+        else
+            YearMonth(year, month - 1)
 }
 
 private fun currentYearMonth(): YearMonth {
+
     val cal = Calendar.getInstance()
-    return YearMonth(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+
+    return YearMonth(
+        cal.get(Calendar.YEAR),
+        cal.get(Calendar.MONTH) + 1
+    )
 }
 
-private fun dayKey(year: Int, month: Int, day: Int): String {
+private fun dayKey(
+    year: Int,
+    month: Int,
+    day: Int
+): String {
+
     val cal = Calendar.getInstance()
-    cal.set(year, month - 1, day, 0, 0, 0)
+
+    cal.set(
+        year,
+        month - 1,
+        day,
+        0,
+        0,
+        0
+    )
+
     return calendarDateFormat.format(cal.time)
 }
 
-/**
- * 이번 달 출석 기록을 보여주는 달력 카드. 카드를 뽑은 날짜는 색이 채워지고 운세 점수가 작게 표시된다.
- * 이전/다음 달로 넘겨서 지난 기록도 확인할 수 있다.
- */
 @Composable
-fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
-    var yearMonth by remember { mutableStateOf(currentYearMonth()) }
-    val todayKey = remember { calendarDateFormat.format(Date()) }
+fun FortuneCalendarSection(
+    checkInHistory: Map<String, FortuneCheckIn>
+) {
+
+    var yearMonth by remember {
+        mutableStateOf(currentYearMonth())
+    }
+
+    val todayKey = remember {
+        calendarDateFormat.format(Date())
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 1.dp
+        )
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+
+        Column(
+            modifier = Modifier.padding(18.dp)
+        ) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
-                Text(text = "📅 오늘의 운세 달력", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { yearMonth = yearMonth.prev() }, modifier = Modifier.size(28.dp)) {
-                        Text(text = "‹", fontSize = 18.sp, color = Color(0xFF7C3AED), fontWeight = FontWeight.Bold)
+
+                Text(
+                    text = "📅 오늘의 운세 달력",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    IconButton(
+                        onClick = {
+                            yearMonth = yearMonth.prev()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Text(
+                            text = "‹",
+                            fontSize = 18.sp,
+                            color = Color(0xFF7C3AED),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
+
                     Text(
-                        text = "${yearMonth.year}.${"%02d".format(yearMonth.month)}",
+                        text =
+                            "${yearMonth.year}.${
+                                "%02d".format(yearMonth.month)
+                            }",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF334155),
-                        modifier = Modifier.padding(horizontal = 4.dp)
+                        modifier = Modifier.padding(
+                            horizontal = 4.dp
+                        )
                     )
-                    IconButton(onClick = { yearMonth = yearMonth.next() }, modifier = Modifier.size(28.dp)) {
-                        Text(text = "›", fontSize = 18.sp, color = Color(0xFF7C3AED), fontWeight = FontWeight.Bold)
+
+                    IconButton(
+                        onClick = {
+                            yearMonth = yearMonth.next()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Text(
+                            text = "›",
+                            fontSize = 18.sp,
+                            color = Color(0xFF7C3AED),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 요일 헤더
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("일", "월", "화", "수", "목", "금", "토").forEach { d ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
+            ) {
+
+                listOf(
+                    "일",
+                    "월",
+                    "화",
+                    "수",
+                    "목",
+                    "금",
+                    "토"
+                ).forEach { dayName ->
+
                     Text(
-                        text = d,
+                        text = dayName,
                         fontSize = 10.sp,
                         color = Color(0xFF94A3B8),
                         textAlign = TextAlign.Center,
@@ -581,64 +1255,229 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
             Spacer(modifier = Modifier.height(6.dp))
 
             val cal = Calendar.getInstance()
-            cal.set(yearMonth.year, yearMonth.month - 1, 1)
-            val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=일요일
-            val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-            val totalCells = firstDayOfWeek + daysInMonth
-            val totalRows = (totalCells + 6) / 7
+            cal.set(
+                yearMonth.year,
+                yearMonth.month - 1,
+                1
+            )
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val firstDayOfWeek =
+                cal.get(Calendar.DAY_OF_WEEK) - 1
+
+            val daysInMonth =
+                cal.getActualMaximum(
+                    Calendar.DAY_OF_MONTH
+                )
+
+            val totalCells =
+                firstDayOfWeek + daysInMonth
+
+            val totalRows =
+                (totalCells + 6) / 7
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+
                 for (row in 0 until totalRows) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween
+                    ) {
+
                         for (col in 0 until 7) {
-                            val cellIndex = row * 7 + col
-                            val day = cellIndex - firstDayOfWeek + 1
+
+                            val cellIndex =
+                                row * 7 + col
+
+                            val day =
+                                cellIndex -
+                                    firstDayOfWeek + 1
+
                             if (day in 1..daysInMonth) {
-                                val key = dayKey(yearMonth.year, yearMonth.month, day)
-                                val record = checkInHistory[key]
-                                val isToday = key == todayKey
-                                CalendarDayCell(day = day, record = record, isToday = isToday)
+
+                                val key =
+                                    dayKey(
+                                        yearMonth.year,
+                                        yearMonth.month,
+                                        day
+                                    )
+
+                                val record =
+                                    checkInHistory[key]
+
+                                val isToday =
+                                    key == todayKey
+
+                                CalendarDayCell(
+                                    day = day,
+                                    record = record,
+                                    isToday = isToday
+                                )
+
                             } else {
-                                Spacer(modifier = Modifier.width(32.dp))
+
+                                Spacer(
+                                    modifier = Modifier.width(
+                                        32.dp
+                                    )
+                                )
                             }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(text = "🔮 카드를 뽑은 날은 운세 점수가 표시돼요", fontSize = 10.sp, color = Color(0xFF94A3B8))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // =========================================================
+            // 점수 범례
+            // =========================================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.SpaceEvenly
+            ) {
+
+                ScoreLegend(
+                    color = Color(0xFF2563EB),
+                    text = "80~100점"
+                )
+
+                ScoreLegend(
+                    color = Color(0xFFEAB308),
+                    text = "60~79점"
+                )
+
+                ScoreLegend(
+                    color = Color(0xFFEF4444),
+                    text = "0~59점"
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text =
+                    "🔮 카드를 뽑은 날은 운세 점수가 표시돼요",
+                fontSize = 10.sp,
+                color = Color(0xFF94A3B8)
+            )
         }
     }
 }
 
 @Composable
-private fun CalendarDayCell(day: Int, record: FortuneCheckIn?, isToday: Boolean) {
-    val hasRecord = record != null
+private fun ScoreLegend(
+    color: Color,
+    text: String
+) {
+
+    Row(
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(
+                    color = color,
+                    shape = CircleShape
+                )
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        Text(
+            text = text,
+            fontSize = 9.sp,
+            color = Color(0xFF64748B)
+        )
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    day: Int,
+    record: FortuneCheckIn?,
+    isToday: Boolean
+) {
+
+    val hasRecord =
+        record != null
+
+    val scoreColor =
+        record?.let {
+            fortuneScoreColor(it.luckScore)
+        }
+
     Column(
         modifier = Modifier
             .width(32.dp)
             .clip(RoundedCornerShape(8.dp))
             .then(
-                if (hasRecord) Modifier.background(Color(0xFFF3E8FF))
-                else Modifier
+                if (
+                    hasRecord &&
+                    scoreColor != null
+                ) {
+                    Modifier.background(
+                        scoreColor.copy(
+                            alpha = 0.10f
+                        )
+                    )
+                } else {
+                    Modifier
+                }
             )
             .then(
-                if (isToday) Modifier.border(1.dp, Color(0xFF7C3AED), RoundedCornerShape(8.dp))
-                else Modifier
+                if (isToday) {
+                    Modifier.border(
+                        1.dp,
+                        Color(0xFF7C3AED),
+                        RoundedCornerShape(8.dp)
+                    )
+                } else {
+                    Modifier
+                }
             )
             .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment =
+            Alignment.CenterHorizontally
     ) {
+
         Text(
             text = "$day",
             fontSize = 11.sp,
-            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-            color = if (hasRecord) Color(0xFF7C3AED) else Color(0xFF334155)
+            fontWeight =
+                if (isToday)
+                    FontWeight.Bold
+                else
+                    FontWeight.Normal,
+            color =
+                if (
+                    hasRecord &&
+                    scoreColor != null
+                )
+                    scoreColor
+                else
+                    Color(0xFF334155)
         )
-        if (hasRecord) {
-            Text(text = "${record!!.luckScore}", fontSize = 8.sp, color = Color(0xFF7C3AED), fontWeight = FontWeight.Bold)
+
+        if (hasRecord && record != null) {
+
+            Text(
+                text = "${record.luckScore}점",
+                fontSize = 7.sp,
+                color =
+                    scoreColor
+                        ?: Color(0xFF64748B),
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
