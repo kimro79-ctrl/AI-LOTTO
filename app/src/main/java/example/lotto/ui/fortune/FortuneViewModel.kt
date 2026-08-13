@@ -391,15 +391,28 @@ class FortuneViewModel @Inject constructor(
         val cardLuckyNumber = _selectedCardInfo.value?.luckyNumber ?: 0
 
         for (i in 0 until pendingSetCount) {
-            val setRandom = Random(seed + i * 99)
+            val setRandom = Random(seed + i * 137)
             val resultSet = mutableSetOf<Int>()
 
+            // 첫 번째 또는 두 번째 세트에만 카드 고유 행운 숫자를 전략적으로 배치하되 연속되지 않도록 제어
             if (i < 2 && cardLuckyNumber in 1..45) {
                 resultSet.add(cardLuckyNumber)
             }
 
             while (resultSet.size < 6) {
-                resultSet.add(setRandom.nextInt(1, 46))
+                val candidate = setRandom.nextInt(1, 46)
+                if (!resultSet.contains(candidate)) {
+                    var hasConsecutive = false
+                    for (existing in resultSet) {
+                        if (kotlin.math.abs(existing - candidate) == 1) {
+                            hasConsecutive = true
+                            break
+                        }
+                    }
+                    if (!hasConsecutive || resultSet.size >= 4) {
+                        resultSet.add(candidate)
+                    }
+                }
             }
             sets.add(resultSet.sorted())
         }
