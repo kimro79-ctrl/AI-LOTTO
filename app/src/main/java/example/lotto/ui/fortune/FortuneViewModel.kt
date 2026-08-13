@@ -54,6 +54,12 @@ class FortuneViewModel @Inject constructor(
     private val _tarotKeyword = MutableStateFlow<String?>(null)
     val tarotKeyword: StateFlow<String?> = _tarotKeyword.asStateFlow()
 
+    private val _tarotMeaningPositive = MutableStateFlow<String?>(null)
+    val tarotMeaningPositive: StateFlow<String?> = _tarotMeaningPositive.asStateFlow()
+
+    private val _tarotMeaningNegative = MutableStateFlow<String?>(null)
+    val tarotMeaningNegative: StateFlow<String?> = _tarotMeaningNegative.asStateFlow()
+
     private val _selectedCardInfo = MutableStateFlow<TarotCardInfo?>(null)
     val selectedCardInfo: StateFlow<TarotCardInfo?> = _selectedCardInfo.asStateFlow()
 
@@ -69,7 +75,6 @@ class FortuneViewModel @Inject constructor(
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
 
-    // 테스트를 위해 1일 1회 제한 해제 (항상 false 유지)
     private val _hasDrawnToday = MutableStateFlow(false)
     val hasDrawnToday: StateFlow<Boolean> = _hasDrawnToday.asStateFlow()
 
@@ -343,6 +348,8 @@ class FortuneViewModel @Inject constructor(
         _selectedCardInfo.value = null
         _tarotCardName.value = null
         _tarotKeyword.value = null
+        _tarotMeaningPositive.value = null
+        _tarotMeaningNegative.value = null
         _generatedTarotSets.value = emptyList()
     }
 
@@ -360,10 +367,11 @@ class FortuneViewModel @Inject constructor(
         _selectedCardInfo.value = selectedCard
         _tarotCardName.value = selectedCard.name
         _tarotKeyword.value = selectedCard.keyword
+        _tarotMeaningPositive.value = selectedCard.positiveFlow
+        _tarotMeaningNegative.value = selectedCard.cautionPoint
 
         regenerateLuckyNumbers()
 
-        // 테스트 편의를 위해 기록은 달력에 남기되 1일 1회 제한 자체는 막지 않음
         val newHistory = _checkInHistory.value.toMutableMap()
         newHistory[todayKey()] = FortuneCheckIn(selectedCard.name, selectedCard.keyword, selectedCard.luckScore)
         _checkInHistory.value = newHistory
