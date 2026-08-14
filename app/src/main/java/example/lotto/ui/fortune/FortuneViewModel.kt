@@ -436,4 +436,7 @@ class FortuneViewModel @Inject constructor(
     fun clearSaveMessage() {
         _saveMessage.value = null
     }
+
+    /** 달력에서 지난 날짜를 탭했을 때, 그날 기록된 카드 이름으로 전체 카드 정보를 다시 찾아온다. */
+    fun getCardInfo(name: String): TarotCardInfo? = tarotDeck.firstOrNull { it.name == name }
 }
