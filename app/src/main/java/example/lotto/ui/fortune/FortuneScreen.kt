@@ -48,7 +48,8 @@ fun FortuneScreen(
 ) {
     var selectedSetCount by remember { mutableStateOf(5) }
     var isShuffling by remember { mutableStateOf(false) }
-    var showDetailDialog by remember { mutableStateOf(false) } // 상세 팝업 제어 상태
+    // 상세 팝업에 띄울 카드. "오늘의 카드" 탭이든 달력에서 지난 날짜를 탭했든 이 하나로 재사용한다.
+    var detailDialogCard by remember { mutableStateOf<TarotCardInfo?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     val tarotCardName by viewModel.tarotCardName.collectAsState()
@@ -74,9 +75,9 @@ fun FortuneScreen(
     }
 
     // 상세 해석 팝업창
-    if (showDetailDialog && selectedCardInfo != null) {
-        val info = selectedCardInfo!!
-        Dialog(onDismissRequest = { showDetailDialog = false }) {
+    if (detailDialogCard != null) {
+        val info = detailDialogCard!!
+        Dialog(onDismissRequest = { detailDialogCard = null }) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,7 +154,7 @@ fun FortuneScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Button(
-                        onClick = { showDetailDialog = false },
+                        onClick = { detailDialogCard = null },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp),
@@ -195,21 +196,52 @@ fun FortuneScreen(
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
             item {
-                FortuneCalendarSection(checkInHistory = checkInHistory)
+                FortuneCalendarSection(
+                    checkInHistory = checkInHistory,
+                    onDayClick = { record ->
+                        viewModel.getCardInfo(record.cardName)?.let { info ->
+                            detailDialogCard = info
+                        }
+                    }
+                )
             }
 
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 2.dp,
+                            brush = Brush.horizontalGradient(colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))),
+                            shape = RoundedCornerShape(22.dp)
+                        ),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = "🔮", fontSize = 26.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "🔮", fontSize = 22.sp)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "오늘의 카드 뽑기",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            style = TextStyle(
+                                fontSize = 17.sp,
+                                brush = Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                            )
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "오늘 당신에게 필요한 메시지를\n카드 한 장으로 확인해보세요",
@@ -293,7 +325,7 @@ fun FortuneScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showDetailDialog = true },
+                                .clickable { detailDialogCard = selectedCardInfo },
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -459,23 +491,46 @@ fun FortuneScreen(
 
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 generatedTarotSets.forEachIndexed { index, numbers ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${index + 1}",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF94A3B8),
-                                            modifier = Modifier.width(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            numbers.forEach { num -> TarotBallItem(number = num, size = 30) }
+                                    val containsLuckyNumber = selectedCardInfo?.luckyNumber?.let { it in numbers } ?: false
+
+                                    Column {
+                                        if (containsLuckyNumber) {
+                                            Surface(
+                                                color = Color(0xFFD1FAE5),
+                                                shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = "🍀 행운번호 포함",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF059669),
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    Color(0xFFF8FAFC),
+                                                    if (containsLuckyNumber) RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                                    else RoundedCornerShape(12.dp)
+                                                )
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${index + 1}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF94A3B8),
+                                                modifier = Modifier.width(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                                                numbers.forEach { num -> TarotBallItem(number = num, size = 30) }
+                                            }
                                         }
                                     }
                                 }
@@ -624,7 +679,10 @@ private fun dayKey(year: Int, month: Int, day: Int): String {
 }
 
 @Composable
-fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
+fun FortuneCalendarSection(
+    checkInHistory: Map<String, FortuneCheckIn>,
+    onDayClick: (FortuneCheckIn) -> Unit = {}
+) {
     var yearMonth by remember { mutableStateOf(currentYearMonth()) }
     val todayKey = remember { calendarDateFormat.format(Date()) }
 
@@ -692,7 +750,12 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
                                 val key = dayKey(yearMonth.year, yearMonth.month, day)
                                 val record = checkInHistory[key]
                                 val isToday = key == todayKey
-                                CalendarDayCell(day = day, record = record, isToday = isToday)
+                                CalendarDayCell(
+                                    day = day,
+                                    record = record,
+                                    isToday = isToday,
+                                    onClick = { record?.let { onDayClick(it) } }
+                                )
                             } else {
                                 Spacer(modifier = Modifier.width(32.dp))
                             }
@@ -702,13 +765,13 @@ fun FortuneCalendarSection(checkInHistory: Map<String, FortuneCheckIn>) {
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            Text(text = "🔮 카드를 뽑은 날은 운세 점수가 표시돼요", fontSize = 10.sp, color = Color(0xFF94A3B8))
+            Text(text = "🔮 카드를 뽑은 날은 운세 점수가 표시돼요 · 탭하면 그날의 운세를 다시 볼 수 있어요", fontSize = 10.sp, color = Color(0xFF94A3B8))
         }
     }
 }
 
 @Composable
-private fun CalendarDayCell(day: Int, record: FortuneCheckIn?, isToday: Boolean) {
+private fun CalendarDayCell(day: Int, record: FortuneCheckIn?, isToday: Boolean, onClick: () -> Unit = {}) {
     val hasRecord = record != null
     Column(
         modifier = Modifier
@@ -721,6 +784,9 @@ private fun CalendarDayCell(day: Int, record: FortuneCheckIn?, isToday: Boolean)
             .then(
                 if (isToday) Modifier.border(1.dp, Color(0xFF7C3AED), RoundedCornerShape(8.dp))
                 else Modifier
+            )
+            .then(
+                if (hasRecord) Modifier.clickable { onClick() } else Modifier
             )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
