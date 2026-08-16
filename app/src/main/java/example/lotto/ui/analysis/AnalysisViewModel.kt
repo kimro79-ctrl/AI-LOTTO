@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.random.Random
 
+// 분석 조건 문구를 상수로 빼서 화면과 ViewModel이 같은 문자열을 참조하게 한다.
+const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
+
 /**
  * 생성된 번호 조합 1개에 대한 통계 분석 결과.
  * 화면에서 "전문 분석 리포트"처럼 보여주기 위한 지표들을 담는다.
@@ -121,9 +124,6 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 }
 
 @HiltViewModel
-// 분석 조건 문구를 상수로 빼서 화면과 ViewModel이 같은 문자열을 참조하게 한다.
-const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
-
 class AnalysisViewModel @Inject constructor(
     application: Application,
     private val repository: LottoRepository
