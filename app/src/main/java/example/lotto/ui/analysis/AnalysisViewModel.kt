@@ -121,6 +121,9 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 }
 
 @HiltViewModel
+// 분석 조건 문구를 상수로 빼서 화면과 ViewModel이 같은 문자열을 참조하게 한다.
+const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
+
 class AnalysisViewModel @Inject constructor(
     application: Application,
     private val repository: LottoRepository
@@ -134,6 +137,13 @@ class AnalysisViewModel @Inject constructor(
 
     private val _saveMessage = MutableStateFlow<String?>(null)
     val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
+
+    // 사카이 분석 실행 중 로딩 상태 및 결과 요약 메시지("최근 N주 기준 M개 번호 활용" 등)
+    private val _isGenerating = MutableStateFlow(false)
+    val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
+
+    private val _sakaiInfoMessage = MutableStateFlow<String?>(null)
+    val sakaiInfoMessage: StateFlow<String?> = _sakaiInfoMessage.asStateFlow()
 
     // 즐겨찾는 번호(항상 포함) / 기피 번호(항상 제외) 설정을 앱을 껐다 켜도 유지하기 위해 SharedPreferences에 저장한다.
     private val prefs = application.getSharedPreferences("lotto_number_prefs", Context.MODE_PRIVATE)
@@ -191,6 +201,73 @@ class AnalysisViewModel @Inject constructor(
 
     fun setCondition(condition: String) {
         _selectedCondition.value = condition
+    }
+
+    /**
+     * 사카이 분석: 실제 있었던 최근 26주 당첨 데이터를 기준으로,
+     * 통계적 평균 출현 횟수(약 3~4회)에 가까운 번호들을 우선 후보로 삼고,
+     * 직전 회차 번호 중 1~2개를 "이월수"로 확률적으로 포함시키는 전통적인 기법이다.
+     * ⚠️ 실제 과거 기록을 쓰긴 하지만, 로또는 매회 독립적인 무작위 추첨이라
+     * 이 방식이 당첨 확률을 높인다는 통계적 근거는 없다 - 역사적으로 통용되는 "선택 기법"일 뿐이다.
+     */
+    fun generateSakaiNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+        viewModelScope.launch {
+            try {
+                val allDraws = fetchHistoricalDraws()
+                val recentWeeks = allDraws.sortedByDescending { it.drawNo }.take(26)
+
+                if (recentWeeks.isEmpty()) {
+                    _saveMessage.value = "과거 데이터를 불러오지 못해 사카이 분석을 적용할 수 없습니다."
+                    _isGenerating.value = false
+                    return@launch
+                }
+
+                val counts = IntArray(46)
+                recentWeeks.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+
+                val avg = recentWeeks.size * 6 / 45.0
+                val lowerBound = (avg - 1).toInt().coerceAtLeast(0)
+                val upperBound = (avg + 1).toInt()
+
+                var candidatePool = (1..45).filter { counts[it] in lowerBound..upperBound }
+                if (candidatePool.size < 10) candidatePool = (1..45).toList() // 후보가 너무 적으면 안전하게 전체로 대체
+
+                val lastDrawNumbers = recentWeeks.maxByOrNull { it.drawNo }?.numbers ?: emptyList()
+
+                val generatedSets = mutableListOf<List<Int>>()
+                repeat(setCount) {
+                    val resultSet = mutableSetOf<Int>()
+
+                    // 이월수: 직전 회차 번호 중 1개를 절반 확률로 포함 (사카이 방식의 특징)
+                    if (lastDrawNumbers.isNotEmpty() && Random.nextBoolean()) {
+                        resultSet.add(lastDrawNumbers.random())
+                    }
+
+                    val pool = candidatePool.filter { it !in resultSet }.ifEmpty { (1..45).filter { n -> n !in resultSet } }
+                    val poolIterator = pool.shuffled().iterator()
+                    while (resultSet.size < 6 && poolIterator.hasNext()) {
+                        resultSet.add(poolIterator.next())
+                    }
+                    // 후보 풀만으로 6개를 못 채우는 극단적인 경우를 대비한 안전장치
+                    var fallbackAttempts = 0
+                    while (resultSet.size < 6 && fallbackAttempts < 200) {
+                        resultSet.add((1..45).random())
+                        fallbackAttempts++
+                    }
+
+                    generatedSets.add(resultSet.sorted())
+                }
+
+                _numberSets.value = generatedSets
+                _sakaiInfoMessage.value = "최근 ${recentWeeks.size}주 데이터 기준 · 평균 출현 ${"%.1f".format(avg)}회에 가까운 번호 ${candidatePool.size}개 활용"
+            } catch (e: Exception) {
+                _saveMessage.value = "과거 데이터를 불러오지 못해 사카이 분석을 적용할 수 없습니다."
+            } finally {
+                _isGenerating.value = false
+            }
+        }
     }
 
     fun generateSmartNumbers(setCount: Int) {
