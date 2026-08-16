@@ -49,6 +49,8 @@ fun AnalysisScreen(
     val context = LocalContext.current
     val numberSets by viewModel.numberSets.collectAsState()
     val selectedCondition by viewModel.selectedCondition.collectAsState()
+    val isGenerating by viewModel.isGenerating.collectAsState()
+    val sakaiInfoMessage by viewModel.sakaiInfoMessage.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
     val favoriteNumbers by viewModel.favoriteNumbers.collectAsState()
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
@@ -116,11 +118,17 @@ fun AnalysisScreen(
                         selectedSetCount = count
                     },
                     onGenerateClick = {
-                        viewModel.generateSmartNumbers(selectedSetCount)
+                        if (selectedCondition == CONDITION_SAKAI) {
+                            viewModel.generateSakaiNumbers(selectedSetCount)
+                        } else {
+                            viewModel.generateSmartNumbers(selectedSetCount)
+                        }
                     },
                     favoriteNumbers = favoriteNumbers,
                     excludedNumbers = excludedNumbers,
-                    onOpenFavoriteExcludeDialog = { showFavoriteExcludeDialog = true }
+                    onOpenFavoriteExcludeDialog = { showFavoriteExcludeDialog = true },
+                    isGenerating = isGenerating,
+                    sakaiInfoMessage = sakaiInfoMessage
                 )
             }
 
@@ -465,7 +473,9 @@ fun SmartPatternAnalysisSection(
     onGenerateClick: () -> Unit,
     favoriteNumbers: Set<Int> = emptySet(),
     excludedNumbers: Set<Int> = emptySet(),
-    onOpenFavoriteExcludeDialog: () -> Unit = {}
+    onOpenFavoriteExcludeDialog: () -> Unit = {},
+    isGenerating: Boolean = false,
+    sakaiInfoMessage: String? = null
 ) {
     Card(
         modifier = Modifier
@@ -593,22 +603,42 @@ fun SmartPatternAnalysisSection(
 
             Button(
                 onClick = onGenerateClick,
+                enabled = !isGenerating,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(46.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0EA5E9)
+                    containerColor = Color(0xFF0EA5E9),
+                    disabledContainerColor = Color(0xFF93C5FD)
                 )
             ) {
-                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "AI 추천 번호 생성하기",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                if (isGenerating) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "과거 데이터 분석 중...", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                } else {
+                    Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "AI 추천 번호 생성하기",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            if (!sakaiInfoMessage.isNullOrBlank()) {
+                Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "📊 $sakaiInfoMessage",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7C3AED),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
             }
         }
     }
@@ -1032,6 +1062,8 @@ fun FavoriteExcludeDialog(
     onDismiss: () -> Unit
 ) {
     var isFavoriteMode by remember { mutableStateOf(true) }
+    var isLoadingRecommendation by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1120,6 +1152,50 @@ fun FavoriteExcludeDialog(
                         color = Color(0xFF64748B),
                         lineHeight = 16.sp
                     )
+
+                    if (!isFavoriteMode) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (!isLoadingRecommendation) {
+                                    isLoadingRecommendation = true
+                                    coroutineScope.launch {
+                                        try {
+                                            val draws = fetchHistoricalDraws()
+                                            val frequencies = computeNumberFrequencies(draws)
+                                            val hotTop10 = frequencies.sortedByDescending { it.count }.take(10).map { it.number }
+                                            hotTop10.forEach { number ->
+                                                if (number !in excludedNumbers) onToggleExcluded(number)
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        } finally {
+                                            isLoadingRecommendation = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                        ) {
+                            if (isLoadingRecommendation) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFEF4444))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("과거 데이터 확인 중...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("🔥 인기번호(핫넘버) 자동 기피 추천", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "실제 과거 데이터에서 가장 자주 나온 번호 10개를 기피 목록에 추가합니다. " +
+                                    "당첨 확률과는 무관하고, 당첨금을 나눠 갖는 인기번호를 피하고 싶을 때 참고용으로만 쓰세요.",
+                            fontSize = 9.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 12.sp
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -1448,11 +1524,11 @@ private suspend fun runMonteCarloSimulation(userNumbers: List<Int>, trials: Int)
 
 // 실제 과거 당첨 회차 1개를 담는 데이터. smok95.github.io의 공개 데이터셋에서 가져온다.
 // (동행복권 도메인이 아니라 GitHub Pages라서 API 차단 문제가 없다.)
-private data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int)
+data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int)
 
 // 같은 세션 안에서 백테스트/핫콜드 등 여러 기능이 반복해서 전체 회차를 새로 받아오지 않도록
 // 한 번 받아온 결과를 메모리에 캐시해둔다.
-private object HistoricalDrawCache {
+object HistoricalDrawCache {
     var draws: List<HistoricalDraw>? = null
 }
 
@@ -1461,7 +1537,7 @@ private object HistoricalDrawCache {
  * 출처: smok95/lotto (GitHub, 커뮤니티가 관리하는 공개 데이터셋). 동행복권 공식 API가 아니므로
  * 최신 회차 반영이 늦거나 일시적으로 접속이 안 될 수 있다.
  */
-private suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
+suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
     HistoricalDrawCache.draws?.let { return it }
 
     return withContext(Dispatchers.IO) {
@@ -2303,6 +2379,7 @@ fun ConditionSelectDialog(
 ) {
     val conditions = listOf(
         "고도화 종합 분석 (7대 로직 적용)",
+        CONDITION_SAKAI,
         "완전 무작위 추첨 (일반 자동)",
         "AC값(번호 복잡도) 기반 필터링",
         "홀짝 / 고저 균형 필터링",
@@ -2351,12 +2428,4 @@ fun ConditionSelectDialog(
             }
         },
         confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = Color(0xFF64748B))
-            }
-        },
-        shape = RoundedCornerShape(20.dp),
-        containerColor = Color.White
-    )
-}
+        
