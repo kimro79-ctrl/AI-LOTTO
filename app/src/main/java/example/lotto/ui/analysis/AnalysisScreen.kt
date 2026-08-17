@@ -2100,10 +2100,12 @@ fun SimulationDialog(
                     enabled = !isSimulating,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(46.dp),
+                        .heightIn(min = 46.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
+                    contentPadding = PaddingValues(vertical = 12.dp, horizontal = 12.dp)
                 ) {
+                    val shortTrialsLabel = if (trials >= 10_000) "${trials / 10_000}만" else "%,d".format(trials)
                     if (isSimulating) {
                         androidx.compose.material3.CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
@@ -2111,13 +2113,14 @@ fun SimulationDialog(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("가상 추첨 ${"%,d".format(trials)}회 진행 중...", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("가상 추첨 ${shortTrialsLabel}회 진행 중...", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                     } else {
                         Text(
-                            text = if (simulationResult == null) "🎲 몬테카를로 시뮬레이션 실행 (${"%,d".format(trials)}회)" else "🎲 다시 실행",
+                            text = if (simulationResult == null) "🎲 몬테카를로 시뮬레이션 실행 (${shortTrialsLabel}회)" else "🎲 다시 실행",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 1
                         )
                     }
                 }
