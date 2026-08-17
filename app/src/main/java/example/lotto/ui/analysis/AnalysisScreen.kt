@@ -338,37 +338,54 @@ fun LogicInfoDialog(onDismiss: () -> Unit) {
     )
 }
 
-// 당첨번호 확인 링크 배너. 동행복권 서버가 앱의 자동 요청을 차단하고 있어
-// 앱 안에서 번호를 직접 보여주는 대신, 공식 사이트로 바로 이동하는 링크만 제공한다.
+// 최신 당첨번호 1회차 데이터 (앱 안에서 바로 보여줄 용도)
+data class LatestDrawResult(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int, val date: String)
+
+/**
+ * 최신 회차 당첨번호를 실시간으로 받아온다.
+ * 출처: smok95/lotto (GitHub Pages, 커뮤니티가 관리하는 공개 데이터셋) - 동행복권 공식 API가 아니므로
+ * 반영이 늦을 가능성은 있지만, 동행복권 도메인이 아니라서 그동안 겪었던 API 차단 문제가 없다.
+ */
+suspend fun fetchLatestDraw(): LatestDrawResult {
+    return withContext(Dispatchers.IO) {
+        val connection = URL("https://smok95.github.io/lotto/results/latest.json").openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 15000
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            val obj = org.json.JSONObject(text)
+            val numsArray = obj.getJSONArray("numbers")
+            val nums = (0 until numsArray.length()).map { numsArray.getInt(it) }
+            LatestDrawResult(
+                drawNo = obj.getInt("draw_no"),
+                numbers = nums,
+                bonusNo = obj.optInt("bonus_no", -1),
+                date = obj.optString("date", "").take(10) // "2026-08-15T00:00:00Z" -> "2026-08-15"
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+}
+
+// 당첨번호 확인 배너. 예전엔 동행복권 API 차단 때문에 외부 링크로만 연결했지만,
+// 이제 smok95 데이터셋으로 앱 안에서 바로 최신 회차를 보여줄 수 있다.
 @Composable
 fun CheckWinResultBanner(modifier: Modifier = Modifier) {
-    val context = LocalContext.current
+    var showDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .clickable {
-                try {
-                    val intent = android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        // 특정 결과 페이지 대신 메인 홈페이지로 연결 - 메인 화면에 최신 회차 당첨번호가
-                        // 바로 표시되고, 하위 경로보다 접속이 훨씬 안정적이다.
-                        android.net.Uri.parse("https://www.dhlottery.co.kr/common.do?method=main")
-                    ).apply {
-                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            },
+            .clickable { showDialog = true },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(46.dp)
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8))
@@ -377,20 +394,147 @@ fun CheckWinResultBanner(modifier: Modifier = Modifier) {
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "🎯", fontSize = 18.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text = "당첨번호 확인",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "동행복권 공식 사이트",
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 9.sp
-                )
+            Text(text = "🎯", fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "당첨번호 확인",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+        }
+    }
+
+    if (showDialog) {
+        WinResultDialog(onDismiss = { showDialog = false })
+    }
+}
+
+/** 최신 회차 당첨번호를 앱 안에서 바로 보여주는 팝업. */
+@Composable
+fun WinResultDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var result by remember { mutableStateOf<LatestDrawResult?>(null) }
+
+    fun load() {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            try {
+                result = fetchLatestDraw()
+            } catch (e: Exception) {
+                errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "🎯 당첨번호 확인", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF0284C7))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("최신 회차 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { load() },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    result != null -> {
+                        val draw = result!!
+                        Text(
+                            text = "${draw.drawNo}회 (${draw.date})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            draw.numbers.forEach { number ->
+                                LottoBall(number = number, size = 38)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "+ 보너스", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            LottoBall(number = draw.bonusNo, size = 32)
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://www.dhlottery.co.kr/common.do?method=main")
+                                    ).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("동행복권 공식 사이트에서 다시 확인", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0284C7))
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "📊 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
+                                    "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있으니, 정확한 확인은 공식 사이트를 이용해주세요.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
             }
         }
     }
@@ -435,7 +579,7 @@ fun FindStoreButton(modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(46.dp)
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA))
@@ -444,21 +588,15 @@ fun FindStoreButton(modifier: Modifier = Modifier) {
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "📍", fontSize = 18.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(
-                    text = "판매점 찾기",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "내 주변 지도로 보기",
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 9.sp
-                )
-            }
+            Text(text = "📍", fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "판매점 찾기",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
         }
     }
 }
