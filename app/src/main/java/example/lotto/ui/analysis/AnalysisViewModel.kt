@@ -120,10 +120,10 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
     )
 }
 
-@HiltViewModel
 // 분석 조건 문구를 상수로 빼서 화면과 ViewModel이 같은 문자열을 참조하게 한다.
 const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
 
+@HiltViewModel
 class AnalysisViewModel @Inject constructor(
     application: Application,
     private val repository: LottoRepository
