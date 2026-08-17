@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
 import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
 import com.kimro.ai.lotto.ui.fortune.FortuneScreen
@@ -52,7 +53,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         NavigationBar(
-                            modifier = Modifier.height(56.dp),
                             containerColor = Color(0xFFF1F5F9),
                             contentColor = Color(0xFF64748B)
                         ) {
@@ -66,7 +66,13 @@ class MainActivity : ComponentActivity() {
                             items.forEach { screen ->
                                 NavigationBarItem(
                                     icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                    label = { Text(screen.title) },
+                                    label = {
+                                        Text(
+                                            text = screen.title,
+                                            fontSize = 11.sp,
+                                            maxLines = 1
+                                        )
+                                    },
                                     selected = currentScreen == screen,
                                     onClick = { currentScreen = screen },
                                     colors = NavigationBarItemDefaults.colors(
