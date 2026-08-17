@@ -2427,5 +2427,13 @@ fun ConditionSelectDialog(
                 }
             }
         },
-        confirmButton = {},
-        
+        confirmButton = { /* 확인 버튼은 사용하지 않음 - 목록에서 바로 선택되는 구조 */ },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", color = Color(0xFF64748B))
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+        containerColor = Color.White
+    )
+}
