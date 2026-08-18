@@ -1248,6 +1248,51 @@ fun FavoriteExcludeDialog(
                         lineHeight = 16.sp
                     )
 
+                    if (isFavoriteMode) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (!isLoadingRecommendation) {
+                                    isLoadingRecommendation = true
+                                    coroutineScope.launch {
+                                        try {
+                                            val draws = fetchHistoricalDraws()
+                                            val frequencies = computeNumberFrequencies(draws)
+                                            val coldTop6 = frequencies.sortedBy { it.count }.take(6).map { it.number }
+                                            coldTop6.forEach { number ->
+                                                if (number !in favoriteNumbers) onToggleFavorite(number)
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        } finally {
+                                            isLoadingRecommendation = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF3B82F6))
+                        ) {
+                            if (isLoadingRecommendation) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF3B82F6))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("과거 데이터 확인 중...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("❄️ 콜드번호(뜸한 번호) 자동 즐겨찾기 추천", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "실제 과거 데이터에서 가장 드물게 나온 번호 6개를 즐겨찾기에 추가합니다. " +
+                                    "\"오래 안 나왔으니 나올 때 됐다\"는 생각으로 걸어보고 싶을 때 참고하세요. " +
+                                    "⚠️ 단, 로또는 매 회차 완전히 독립적인 추첨이라 실제로 확률이 올라가는 건 아니에요.",
+                            fontSize = 9.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 12.sp
+                        )
+                    }
+
                     if (!isFavoriteMode) {
                         Spacer(modifier = Modifier.height(10.dp))
                         OutlinedButton(
@@ -1286,6 +1331,49 @@ fun FavoriteExcludeDialog(
                         Text(
                             text = "실제 과거 데이터에서 가장 자주 나온 번호 10개를 기피 목록에 추가합니다. " +
                                     "당첨 확률과는 무관하고, 당첨금을 나눠 갖는 인기번호를 피하고 싶을 때 참고용으로만 쓰세요.",
+                            fontSize = 9.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (!isLoadingRecommendation) {
+                                    isLoadingRecommendation = true
+                                    coroutineScope.launch {
+                                        try {
+                                            val draws = fetchHistoricalDraws()
+                                            val frequencies = computeNumberFrequencies(draws)
+                                            val coldTop10 = frequencies.sortedBy { it.count }.take(10).map { it.number }
+                                            coldTop10.forEach { number ->
+                                                if (number !in excludedNumbers) onToggleExcluded(number)
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        } finally {
+                                            isLoadingRecommendation = false
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF3B82F6))
+                        ) {
+                            if (isLoadingRecommendation) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF3B82F6))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("과거 데이터 확인 중...", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Text("❄️ 콜드번호(뜸한 번호) 자동 기피 추천", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "실제 과거 데이터에서 가장 드물게 나온 번호 10개를 기피 목록에 추가합니다. " +
+                                    "⚠️ 참고: 과거에 드물게 나왔다고 앞으로도 안 나올 확률이 높은 건 아니에요(매 회차 독립 추첨). " +
+                                    "그냥 개인 취향으로 걸러내고 싶을 때만 참고용으로 쓰세요.",
                             fontSize = 9.sp,
                             color = Color(0xFF94A3B8),
                             lineHeight = 12.sp
