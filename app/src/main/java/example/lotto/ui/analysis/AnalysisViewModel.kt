@@ -231,6 +231,9 @@ class AnalysisViewModel @Inject constructor(
                     return@launch
                 }
 
+                val favorites = _favoriteNumbers.value
+                val excluded = _excludedNumbers.value
+
                 val counts = IntArray(46)
                 recentWeeks.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
 
@@ -240,27 +243,32 @@ class AnalysisViewModel @Inject constructor(
 
                 var candidatePool = (1..45).filter { counts[it] in lowerBound..upperBound }
                 if (candidatePool.size < 10) candidatePool = (1..45).toList() // 후보가 너무 적으면 안전하게 전체로 대체
+                candidatePool = candidatePool.filter { it !in excluded } // 기피 번호는 후보에서 제외
 
-                val lastDrawNumbers = recentWeeks.maxByOrNull { it.drawNo }?.numbers ?: emptyList()
+                val lastDrawNumbers = recentWeeks.maxByOrNull { it.drawNo }?.numbers?.filter { it !in excluded } ?: emptyList()
 
                 val generatedSets = mutableListOf<List<Int>>()
                 repeat(setCount) {
                     val resultSet = mutableSetOf<Int>()
+                    resultSet.addAll(favorites) // 즐겨찾기 번호는 항상 강제 포함
 
-                    // 이월수: 직전 회차 번호 중 1개를 절반 확률로 포함 (사카이 방식의 특징)
+                    // 이월수: 직전 회차 번호 중 1개를 절반 확률로 포함 (사카이 방식의 특징) - 기피 번호는 후보에서 이미 제외됨
                     if (lastDrawNumbers.isNotEmpty() && Random.nextBoolean()) {
                         resultSet.add(lastDrawNumbers.random())
                     }
 
-                    val pool = candidatePool.filter { it !in resultSet }.ifEmpty { (1..45).filter { n -> n !in resultSet } }
+                    val pool = candidatePool.filter { it !in resultSet }.ifEmpty {
+                        (1..45).filter { n -> n !in resultSet && n !in excluded }
+                    }
                     val poolIterator = pool.shuffled().iterator()
                     while (resultSet.size < 6 && poolIterator.hasNext()) {
                         resultSet.add(poolIterator.next())
                     }
-                    // 후보 풀만으로 6개를 못 채우는 극단적인 경우를 대비한 안전장치
+                    // 후보 풀만으로 6개를 못 채우는 극단적인 경우를 대비한 안전장치 (기피 번호는 여전히 피한다)
                     var fallbackAttempts = 0
                     while (resultSet.size < 6 && fallbackAttempts < 200) {
-                        resultSet.add((1..45).random())
+                        val candidate = (1..45).random()
+                        if (candidate !in excluded) resultSet.add(candidate)
                         fallbackAttempts++
                     }
 
