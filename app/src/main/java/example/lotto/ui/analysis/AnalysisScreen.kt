@@ -840,6 +840,8 @@ fun ManualPickDialog(
 ) {
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
+    var showSimulationDialog by remember { mutableStateOf(false) }
+    var showBacktestDialog by remember { mutableStateOf(false) }
     var showHotColdDialog by remember { mutableStateOf(false) }
 
     // 번호가 바뀌면 저장 완료 상태는 초기화
@@ -1082,13 +1084,57 @@ fun ManualPickDialog(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        AdvancedToolsButton(numbers = sortedSelected)
+                        OutlinedButton(
+                            onClick = { showSimulationDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "💰 몬테카를로 시뮬레이션",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { showBacktestDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "📜 과거 회차 백테스트",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0EA5E9)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
+    }
+
+    if (showSimulationDialog) {
+        SimulationDialog(
+            numbers = sortedSelected,
+            onDismiss = { showSimulationDialog = false }
+        )
+    }
+
+    if (showBacktestDialog) {
+        BacktestDialog(
+            numbers = sortedSelected,
+            onDismiss = { showBacktestDialog = false }
+        )
     }
 
     if (showHotColdDialog) {
@@ -1410,6 +1456,8 @@ fun LottoSetCard(
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
+    var showSimulationDialog by remember { mutableStateOf(false) }
+    var showBacktestDialog by remember { mutableStateOf(false) }
     val analysis = remember(numbers) {
         analyzeLottoSet(numbers)
     }
@@ -1519,9 +1567,53 @@ fun LottoSetCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                AdvancedToolsButton(numbers = numbers)
+                OutlinedButton(
+                    onClick = { showSimulationDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "💰 몬테카를로 시뮬레이션",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7C3AED)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showBacktestDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "📜 과거 회차 백테스트",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0EA5E9)
+                    )
+                }
             }
         }
+    }
+
+    if (showSimulationDialog) {
+        SimulationDialog(
+            numbers = numbers,
+            onDismiss = { showSimulationDialog = false }
+        )
+    }
+
+    if (showBacktestDialog) {
+        BacktestDialog(
+            numbers = numbers,
+            onDismiss = { showBacktestDialog = false }
+        )
     }
 }
 
@@ -2436,100 +2528,6 @@ fun InfoChip(modifier: Modifier = Modifier, title: String, value: String) {
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF334155)
             )
-        }
-    }
-}
-
-/**
- * "당첨 확률 시뮬레이션"과 "과거 회차 백테스트"를 버튼 2개로 각각 늘어놓는 대신,
- * "🔍 고급 분석 도구" 버튼 하나로 묶고 누르면 선택 메뉴가 뜨는 방식.
- * 조합 카드마다 버튼이 계속 늘어나는 걸 막기 위한 공용 컴포넌트.
- */
-@Composable
-fun AdvancedToolsButton(numbers: List<Int>, accentColor: Color = Color(0xFF7C3AED)) {
-    var showMenu by remember { mutableStateOf(false) }
-    var showSimulationDialog by remember { mutableStateOf(false) }
-    var showBacktestDialog by remember { mutableStateOf(false) }
-
-    OutlinedButton(
-        onClick = { showMenu = true },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(42.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Text(
-            text = "🔍 고급 분석 도구",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = accentColor
-        )
-    }
-
-    if (showMenu) {
-        Dialog(onDismissRequest = { showMenu = false }) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "고급 분석 도구", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                        IconButton(onClick = { showMenu = false }, modifier = Modifier.size(24.dp)) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    ToolMenuRow(
-                        icon = "💰",
-                        title = "당첨 확률 시뮬레이션",
-                        subtitle = "몬테카를로로 이론값 검증",
-                        onClick = { showMenu = false; showSimulationDialog = true }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ToolMenuRow(
-                        icon = "📜",
-                        title = "과거 회차 백테스트",
-                        subtitle = "1회~최신 실제 데이터와 비교",
-                        onClick = { showMenu = false; showBacktestDialog = true }
-                    )
-                }
-            }
-        }
-    }
-
-    if (showSimulationDialog) {
-        SimulationDialog(numbers = numbers, onDismiss = { showSimulationDialog = false })
-    }
-
-    if (showBacktestDialog) {
-        BacktestDialog(numbers = numbers, onDismiss = { showBacktestDialog = false })
-    }
-}
-
-@Composable
-private fun ToolMenuRow(icon: String, title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF8FAFC))
-            .clickable { onClick() }
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = icon, fontSize = 20.sp)
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-            Text(text = subtitle, fontSize = 11.sp, color = Color(0xFF94A3B8))
         }
     }
 }
