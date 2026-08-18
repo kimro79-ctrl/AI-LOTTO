@@ -1092,7 +1092,7 @@ fun ManualPickDialog(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = "💰 몬테카를로 시뮬레이션",
+                                text = "💰 당첨 확률 시뮬레이션",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED)
@@ -1575,7 +1575,7 @@ fun LottoSetCard(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = "💰 몬테카를로 시뮬레이션",
+                        text = "💰 당첨 확률 시뮬레이션",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF7C3AED)
