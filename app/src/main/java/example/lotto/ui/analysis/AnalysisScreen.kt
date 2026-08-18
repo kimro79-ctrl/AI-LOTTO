@@ -61,6 +61,17 @@ fun AnalysisScreen(
     var showFavoriteExcludeDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
 
+    // 앱 사용법 안내 팝업 - "오늘 하루 보지 않기"를 체크하지 않으면 앱을 켤 때마다 다시 뜬다.
+    var showGuideDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("app_guide_prefs", android.content.Context.MODE_PRIVATE)
+        val todayKey = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+        val lastDismissedDate = prefs.getString("last_dismissed_date", null)
+        if (lastDismissedDate != todayKey) {
+            showGuideDialog = true
+        }
+    }
+
     LaunchedEffect(saveMessage) {
         saveMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -275,10 +286,127 @@ fun AnalysisScreen(
             onDismiss = { showFavoriteExcludeDialog = false }
         )
     }
+
+    if (showGuideDialog) {
+        AppGuideDialog(onDismiss = { showGuideDialog = false })
+    }
 }
 
 // 7대 로직 각각에 대한 이름 + 짧은 설명
 private data class LogicInfoItem(val title: String, val description: String)
+
+/**
+ * 앱 실행 시 뜨는 사용법 안내 팝업. 주요 기능을 짧게 소개한다.
+ * "오늘 하루 보지 않기"를 체크하고 닫으면 그날은 다시 안 뜨고, 다음 날 앱을 켜면 다시 뜬다.
+ */
+private data class GuideFeatureItem(val emoji: String, val title: String, val description: String)
+
+private val guideFeatures = listOf(
+    GuideFeatureItem("⭐", "AI 추천 번호 생성", "7가지 분석 조건 중 골라서 번호를 생성해요. 상단 초록 배너에서 조건을 바꿀 수 있어요."),
+    GuideFeatureItem("🌟🚫", "즐겨찾기 · 기피 번호", "항상 포함할 번호(최대 6개)와 절대 빼고 싶은 번호를 미리 설정해두면 생성할 때 반영돼요."),
+    GuideFeatureItem("💰📜", "당첨 확률 시뮬레이션 · 백테스트", "조합을 펼치면 몬테카를로 시뮬레이션(가상 검증)과 실제 과거 회차 대비 결과를 확인할 수 있어요."),
+    GuideFeatureItem("🔥❄️", "핫/콜드 번호", "실제 데이터에서 자주·드물게 나온 번호를 확인하고, 즐겨찾기·기피에 자동으로 추천받을 수 있어요."),
+    GuideFeatureItem("🔮", "타로 운세", "하단 '운세' 탭에서 매일 카드를 뽑고, 그 기운을 반영한 행운번호도 함께 받아보세요.")
+)
+
+@Composable
+fun AppGuideDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var dontShowToday by remember { mutableStateOf(false) }
+
+    fun closeDialog() {
+        if (dontShowToday) {
+            val prefs = context.getSharedPreferences("app_guide_prefs", android.content.Context.MODE_PRIVATE)
+            val todayKey = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+            prefs.edit().putString("last_dismissed_date", todayKey).apply()
+        }
+        onDismiss()
+    }
+
+    Dialog(onDismissRequest = { closeDialog() }) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "👋 AI 스마트 로또 분석 사용법",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    IconButton(onClick = { closeDialog() }, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    guideFeatures.forEach { feature ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(text = feature.emoji, fontSize = 18.sp, modifier = Modifier.width(48.dp))
+                            Column {
+                                Text(
+                                    text = feature.title,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0F172A)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = feature.description,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF64748B),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { dontShowToday = !dontShowToday }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = dontShowToday,
+                        onCheckedChange = { dontShowToday = it },
+                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF7C3AED))
+                    )
+                    Text(text = "오늘 하루 보지 않기", fontSize = 13.sp, color = Color(0xFF334155))
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = { closeDialog() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
+                ) {
+                    Text(text = "확인했어요", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+    }
+}
 
 private val sevenLogics = listOf(
     LogicInfoItem("① 홀짝 균형", "홀수와 짝수 개수를 3:3에 가깝게 맞춰 극단적인 편중을 방지합니다."),
