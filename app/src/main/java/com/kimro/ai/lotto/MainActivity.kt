@@ -4,8 +4,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.List
@@ -13,9 +25,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
 import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
@@ -57,30 +71,41 @@ class MainActivity : ComponentActivity() {
                             Screen.History
                         )
 
-                        NavigationBar(
-                            containerColor = Color(0xFFF1F5F9),
-                            contentColor = Color(0xFF64748B)
+                        // 표준 NavigationBar는 내부 여백을 줄일 수 없어서, 직접 만든 Row로 교체했다.
+                        // .windowInsetsPadding(WindowInsets.navigationBars)로 기기의 제스처바 영역만큼
+                        // 자동으로 띄우고, 혹시 몰라 최소 8dp 여백도 추가로 깔아 안전하게 만든다.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF1F5F9))
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(top = 2.dp, bottom = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             items.forEach { screen ->
-                                NavigationBarItem(
-                                    icon = { Icon(screen.icon, contentDescription = screen.title) },
-                                    label = {
-                                        Text(
-                                            text = screen.title,
-                                            fontSize = 11.sp,
-                                            maxLines = 1
-                                        )
-                                    },
-                                    selected = currentScreen == screen,
-                                    onClick = { currentScreen = screen },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = Color(0xFF0EA5E9),
-                                        selectedTextColor = Color(0xFF0EA5E9),
-                                        unselectedIconColor = Color(0xFF64748B),
-                                        unselectedTextColor = Color(0xFF64748B),
-                                        indicatorColor = Color(0xFFE0F2FE)
+                                val selected = currentScreen == screen
+                                val tint = if (selected) Color(0xFF0EA5E9) else Color(0xFF64748B)
+
+                                Column(
+                                    modifier = Modifier
+                                        .clickable { currentScreen = screen }
+                                        .padding(horizontal = 10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        screen.icon,
+                                        contentDescription = screen.title,
+                                        tint = tint,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                )
+                                    Spacer(modifier = Modifier.height(1.dp))
+                                    Text(
+                                        text = screen.title,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        color = tint
+                                    )
+                                }
                             }
                         }
                     }
