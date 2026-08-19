@@ -45,6 +45,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kimro.ai.lotto.data.local.LottoEntity
 import com.kimro.ai.lotto.ui.analysis.analyzeLottoSet
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 // 필터 옵션. "저장 시 type 문자열"을 하나 이상 매핑해서 여러 타입을 하나로 묶을 수 있게 했다.
 // (예: 타로 화면은 "TAROT", 예전 코드는 "FORTUNE"으로 저장한 이력이 섞여있어도 "운세"로 함께 묶임)
@@ -60,6 +63,29 @@ private enum class HistorySort(val label: String) {
     SCORE("균형도 점수순")
 }
 
+/** entity.date는 "yyyy-MM-dd HH:mm" 형식이라, 앞 10글자만 잘라내면 날짜별 그룹 키가 된다. */
+private fun dateKeyOf(entity: LottoEntity): String = entity.date.take(10)
+
+/** "2026-08-19" 같은 키를 "오늘 · 8월 19일" / "어제 · 8월 18일" / "2026년 8월 17일" 형태로 보기 좋게 바꾼다. */
+private fun formatDateGroupLabel(dateKey: String): String {
+    val parts = dateKey.split("-")
+    if (parts.size != 3) return dateKey
+    val (year, month, day) = parts
+
+    val today = Calendar.getInstance()
+    val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(today.time)
+
+    val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -1) }
+    val yesterdayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(yesterday.time)
+
+    val monthDay = "${month.toInt()}월 ${day.toInt()}일"
+    return when (dateKey) {
+        todayKey -> "오늘 · $monthDay"
+        yesterdayKey -> "어제 · $monthDay"
+        else -> "${year}년 $monthDay"
+    }
+}
+
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
@@ -67,6 +93,8 @@ fun HistoryScreen(
     val historyList by viewModel.historyList.collectAsState()
 
     var showClearAllDialog by remember { mutableStateOf(false) }
+    // 삭제 확인을 기다리는 날짜 그룹 키. null이 아니면 "이 날짜 삭제할까요?" 팝업이 뜬다.
+    var dateGroupPendingDelete by remember { mutableStateOf<String?>(null) }
     var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
     var selectedSort by remember { mutableStateOf(HistorySort.LATEST) }
 
@@ -83,6 +111,15 @@ fun HistoryScreen(
                 if (numbers.size == 6) analyzeLottoSet(numbers).score else -1
             }
         }
+    }
+
+    // 날짜별로 묶는다. 날짜 그룹 자체는 항상 최신 날짜가 위로 오도록 정렬하고,
+    // 그룹 안의 순서는 위에서 이미 계산한 displayedList(최신순 또는 점수순)의 순서를 그대로 따른다.
+    val groupedByDate = remember(displayedList) {
+        displayedList
+            .groupBy { dateKeyOf(it) }
+            .toList()
+            .sortedByDescending { (dateKey, _) -> dateKey }
     }
 
     Column(
@@ -196,16 +233,28 @@ fun HistoryScreen(
             }
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(
-                    items = displayedList,
-                    key = { item -> item.id }
-                ) { item ->
-                    HistoryItem(
-                        entity = item,
-                        onDeleteClick = { viewModel.deleteHistory(item.id) }
-                    )
+                groupedByDate.forEach { (dateKey, itemsForDate) ->
+                    item(key = "header_$dateKey") {
+                        DateGroupHeader(
+                            dateKey = dateKey,
+                            count = itemsForDate.size,
+                            onDeleteGroupClick = { dateGroupPendingDelete = dateKey }
+                        )
+                    }
+                    items(
+                        items = itemsForDate,
+                        key = { item -> item.id }
+                    ) { item ->
+                        HistoryItem(
+                            entity = item,
+                            onDeleteClick = { viewModel.deleteHistory(item.id) }
+                        )
+                    }
+                    item(key = "spacer_$dateKey") {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
                 }
             }
         }
@@ -230,6 +279,71 @@ fun HistoryScreen(
                 }
             }
         )
+    }
+
+    // 날짜 그룹 삭제 확인 팝업
+    val groupKeyToDelete = dateGroupPendingDelete
+    if (groupKeyToDelete != null) {
+        val groupLabel = formatDateGroupLabel(groupKeyToDelete)
+        val groupCount = groupedByDate.firstOrNull { it.first == groupKeyToDelete }?.second?.size ?: 0
+        AlertDialog(
+            onDismissRequest = { dateGroupPendingDelete = null },
+            title = { Text("날짜별 삭제") },
+            text = { Text("'$groupLabel'에 저장된 ${groupCount}개 조합을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    historyList
+                        .filter { dateKeyOf(it) == groupKeyToDelete }
+                        .forEach { entity -> viewModel.deleteHistory(entity.id) }
+                    dateGroupPendingDelete = null
+                }) {
+                    Text("삭제", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { dateGroupPendingDelete = null }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+}
+
+/** 날짜 그룹 상단에 붙는 헤더. "오늘 · 8월 19일 (2)" 형태로 보여주고, 옆에 이 날짜만 삭제하는 버튼이 있다. */
+@Composable
+fun DateGroupHeader(dateKey: String, count: Int, onDeleteGroupClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = formatDateGroupLabel(dateKey),
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = Color(0xFF334155)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "${count}개",
+                fontSize = 12.sp,
+                color = Color(0xFF94A3B8)
+            )
+        }
+        IconButton(
+            onClick = onDeleteGroupClick,
+            modifier = Modifier.size(26.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "이 날짜 전체 삭제",
+                tint = Color(0xFFEF4444).copy(alpha = 0.65f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 
