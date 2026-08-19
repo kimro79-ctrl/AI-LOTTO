@@ -59,6 +59,15 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // "example" 패키지는 프로젝트 초반에 참고용으로 받은 예시/템플릿 코드가 그대로 남아있는 폴더다.
+    // 실제 앱(MainActivity 등)은 전부 "com.kimro.ai.lotto" 패키지만 사용하고 이 폴더는 참조하지 않는다.
+    // 파일을 삭제하지 않고, 컴파일 대상에서만 제외해서 빌드 에러(중복 클래스, 참조 오류 등)를 막는다.
+    sourceSets {
+        getByName("main") {
+            java.exclude("example/**")
+        }
+    }
 }
 
 dependencies {
