@@ -99,10 +99,13 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
     // AdMob (보상형 광고)
-    // play-services-ads가 끌고 오는 "가짜" listenablefuture(빈 껍데기 라이브러리)가
-    // CameraX(QR스캔)가 필요로 하는 "진짜" Guava ListenableFuture를 가려버려서
-    // "Cannot access class ListenableFuture" 에러가 났다. 그 가짜 모듈만 정확히 제외한다.
-    implementation("com.google.android.gms:play-services-ads:23.6.0") {
-        exclude(group = "com.google.guava", module = "listenablefuture")
-    }
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
+}
+
+// play-services-ads뿐 아니라 다른 라이브러리들도 각자 "가짜" listenablefuture(빈 껍데기)를
+// 끌고 들어와서, 진짜 Guava(com.google.guava:guava)의 ListenableFuture와 충돌(중복 클래스)이 났다.
+// 특정 라이브러리 하나만 막는 게 아니라, 프로젝트 전체 의존성에서 이 가짜 모듈을 원천 차단한다.
+// (구글 공식 안내: d.android.com/r/tools/classpath-sync-errors)
+configurations.all {
+    exclude(group = "com.google.guava", module = "listenablefuture")
 }
