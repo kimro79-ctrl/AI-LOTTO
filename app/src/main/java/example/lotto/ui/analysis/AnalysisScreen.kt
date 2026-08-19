@@ -79,6 +79,11 @@ fun AnalysisScreen(
         }
     }
 
+    // 몬테카를로 시뮬레이션 버튼을 눌렀을 때 대기 없이 바로 뜨도록, 화면 진입 시 미리 광고를 받아둔다.
+    LaunchedEffect(Unit) {
+        com.kimro.ai.lotto.ads.RewardedAdManager.preload(context)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1189,6 +1194,7 @@ fun ManualPickDialog(
     onSaveClick: (List<Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
@@ -1436,14 +1442,25 @@ fun ManualPickDialog(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         OutlinedButton(
-                            onClick = { showSimulationDialog = true },
+                            onClick = {
+                                val activity = context as? android.app.Activity
+                                if (activity != null) {
+                                    com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
+                                        activity = activity,
+                                        onRewardEarned = { showSimulationDialog = true },
+                                        onAdUnavailable = { showSimulationDialog = true }
+                                    )
+                                } else {
+                                    showSimulationDialog = true
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = "💰 당첨 확률 시뮬레이션",
+                                text = "🎬 광고 보고 시뮬레이션 실행",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED)
@@ -1805,6 +1822,7 @@ fun LottoSetCard(
     initiallyExpanded: Boolean = false,
     onSaveClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
@@ -1919,14 +1937,25 @@ fun LottoSetCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedButton(
-                    onClick = { showSimulationDialog = true },
+                    onClick = {
+                        val activity = context as? android.app.Activity
+                        if (activity != null) {
+                            com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
+                                activity = activity,
+                                onRewardEarned = { showSimulationDialog = true },
+                                onAdUnavailable = { showSimulationDialog = true }
+                            )
+                        } else {
+                            showSimulationDialog = true
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(42.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = "💰 당첨 확률 시뮬레이션",
+                        text = "🎬 광고 보고 시뮬레이션 실행",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF7C3AED)
