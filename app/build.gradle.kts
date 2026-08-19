@@ -100,6 +100,10 @@ dependencies {
 
     // AdMob (보상형 광고)
     implementation("com.google.android.gms:play-services-ads:23.6.0")
+
+    // CameraX(QR스캔)가 필요로 하는 ListenableFuture의 "진짜" 구현체를 직접, 명시적으로 추가한다.
+    // 다른 라이브러리가 간접적으로 끌고 오는 것에 의존하면 컴파일 시점에 못 잡힐 수 있어서 직접 선언한다.
+    implementation("com.google.guava:guava:31.1-android")
 }
 
 // play-services-ads뿐 아니라 다른 라이브러리들도 각자 "가짜" listenablefuture(빈 껍데기)를
