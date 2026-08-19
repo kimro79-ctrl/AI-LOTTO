@@ -97,4 +97,7 @@ dependencies {
     // Retrofit & Gson (API 통신용 추가)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // AdMob (보상형 광고)
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
 }
