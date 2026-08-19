@@ -104,7 +104,7 @@ fun AnalysisScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFF8FAFC)
+                    containerColor = Color(0xFFF1F5F9).copy(alpha = 0.92f)
                 )
             )
         },
