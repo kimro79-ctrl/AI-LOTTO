@@ -105,7 +105,7 @@ fun QrScanScreen() {
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 카메라 미리보기 카드
             Card(
@@ -115,26 +115,26 @@ fun QrScanScreen() {
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "📷", fontSize = 18.sp)
+                        Text(text = "📷", fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "로또 용지 QR을 비춰주세요",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF0F172A)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(360.dp)
+                            .height(260.dp)
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color.Black)
                     ) {
@@ -242,7 +242,7 @@ fun QrScanScreen() {
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // 사용법 안내 카드
             Card(
@@ -251,24 +251,24 @@ fun QrScanScreen() {
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = "이렇게 사용하세요",
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     GuideStepRow(step = "1", text = "로또 용지 뒷면의 QR 코드를 사각형 안에 맞춰주세요")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     GuideStepRow(step = "2", text = "인식되면 자동으로 동행복권 당첨 확인 페이지로 이동해요")
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     GuideStepRow(step = "3", text = "여러 장 확인할 땐, 뒤로가기 후 다음 용지를 다시 비춰주세요")
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }
@@ -309,19 +309,19 @@ private fun GuideStepRow(step: String, text: String) {
     Row(verticalAlignment = Alignment.Top) {
         Box(
             modifier = Modifier
-                .size(24.dp)
+                .size(22.dp)
                 .clip(CircleShape)
                 .background(Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = step, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(text = step, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = text,
-            fontSize = 13.sp,
+            fontSize = 12.sp,
             color = Color(0xFF64748B),
-            lineHeight = 18.sp
+            lineHeight = 16.sp
         )
     }
 }
