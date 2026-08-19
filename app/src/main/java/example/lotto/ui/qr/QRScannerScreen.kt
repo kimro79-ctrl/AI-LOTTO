@@ -251,7 +251,7 @@ fun QrScanScreen() {
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 18.dp)) {
                     Text(
                         text = "이렇게 사용하세요",
                         fontSize = 13.sp,
@@ -264,7 +264,7 @@ fun QrScanScreen() {
                     Spacer(modifier = Modifier.height(6.dp))
                     GuideStepRow(step = "2", text = "인식되면 자동으로 동행복권 당첨 확인 페이지로 이동해요")
                     Spacer(modifier = Modifier.height(6.dp))
-                    GuideStepRow(step = "3", text = "여러 장 확인할 땐, 뒤로가기 후 다음 용지를 다시 비춰주세요")
+                    GuideStepRow(step = "3", text = "여러 장 확인은 뒤로가기 후 반복하면 돼요")
                 }
             }
 
