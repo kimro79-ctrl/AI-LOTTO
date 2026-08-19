@@ -566,6 +566,7 @@ fun LatestDrawCard() {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<LatestDrawResult?>(null) }
+    var showRoundDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         try {
@@ -622,12 +623,226 @@ fun LatestDrawCard() {
                         Spacer(modifier = Modifier.width(8.dp))
                         LottoBall(number = draw.bonusNo, size = 30)
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showRoundDialog = true },
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "회차별 조회", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                        Text(text = " ›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "📊 커뮤니티 공개 데이터 기준 (동행복권 공식 아님, 반영이 늦을 수 있어요)",
                         fontSize = 9.sp,
                         color = Color(0xFF94A3B8)
                     )
+                }
+            }
+        }
+    }
+
+    if (showRoundDialog) {
+        DrawByRoundDialog(onDismiss = { showRoundDialog = false })
+    }
+}
+
+/**
+ * 회차 번호를 직접 입력하거나 ◀ ▶로 한 회차씩 넘겨가며 과거 당첨번호를 조회하는 팝업.
+ * 백테스트/핫콜드와 같은 전체 회차 데이터(fetchHistoricalDraws)를 그대로 재사용하므로
+ * 별도로 새 데이터를 받아올 필요가 없다.
+ */
+@Composable
+fun DrawByRoundDialog(onDismiss: () -> Unit) {
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var allDraws by remember { mutableStateOf<List<HistoricalDraw>?>(null) }
+    var selectedRound by remember { mutableStateOf<Int?>(null) }
+    var roundInput by remember { mutableStateOf("") }
+
+    fun load() {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            try {
+                val draws = fetchHistoricalDraws()
+                allDraws = draws
+                val latest = draws.maxByOrNull { it.drawNo }
+                selectedRound = latest?.drawNo
+                roundInput = latest?.drawNo?.toString() ?: ""
+            } catch (e: Exception) {
+                errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    val minRound = allDraws?.minOfOrNull { it.drawNo } ?: 1
+    val maxRound = allDraws?.maxOfOrNull { it.drawNo } ?: 1
+    val currentDraw = remember(selectedRound, allDraws) {
+        allDraws?.firstOrNull { it.drawNo == selectedRound }
+    }
+
+    fun moveRound(delta: Int) {
+        val current = selectedRound ?: return
+        val target = (current + delta).coerceIn(minRound, maxRound)
+        selectedRound = target
+        roundInput = target.toString()
+    }
+
+    fun jumpToInput() {
+        val target = roundInput.toIntOrNull() ?: return
+        selectedRound = target.coerceIn(minRound, maxRound)
+        roundInput = selectedRound.toString()
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "회차별 당첨번호", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { load() },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    else -> {
+                        // 회차 이동/입력 컨트롤
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(
+                                onClick = { moveRound(-1) },
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(Color(0xFFF3E8FF), RoundedCornerShape(10.dp))
+                            ) {
+                                Text("‹", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                            }
+
+                            OutlinedTextField(
+                                value = roundInput,
+                                onValueChange = { input -> roundInput = input.filter { it.isDigit() }.take(5) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+                                suffix = { Text("회", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            IconButton(
+                                onClick = { moveRound(1) },
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(Color(0xFFF3E8FF), RoundedCornerShape(10.dp))
+                            ) {
+                                Text("›", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
+                            }
+
+                            Button(
+                                onClick = { jumpToInput() },
+                                modifier = Modifier.height(48.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                            ) {
+                                Text("조회", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "1회 ~ ${maxRound}회 사이 회차를 조회할 수 있어요",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        if (currentDraw != null) {
+                            val draw = currentDraw
+                            Surface(color = Color(0xFFF8FAFC), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "${draw.drawNo}회", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                                        if (draw.date.isNotBlank()) {
+                                            Text(text = draw.date, fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                            draw.numbers.sorted().forEach { number ->
+                                                LottoBall(number = number, size = 32)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(text = "+", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        LottoBall(number = draw.bonusNo, size = 32)
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(text = "해당 회차 데이터를 찾을 수 없어요", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "📊 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto) 기준입니다. " +
+                                    "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있어요.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                    }
                 }
             }
         }
@@ -1843,7 +2058,7 @@ private suspend fun runMonteCarloSimulation(userNumbers: List<Int>, trials: Int)
 
 // 실제 과거 당첨 회차 1개를 담는 데이터. smok95.github.io의 공개 데이터셋에서 가져온다.
 // (동행복권 도메인이 아니라 GitHub Pages라서 API 차단 문제가 없다.)
-data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int)
+data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: Int, val date: String = "")
 
 // 같은 세션 안에서 백테스트/핫콜드 등 여러 기능이 반복해서 전체 회차를 새로 받아오지 않도록
 // 한 번 받아온 결과를 메모리에 캐시해둔다.
@@ -1874,7 +2089,8 @@ suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
                 val numsArray = obj.getJSONArray("numbers")
                 val nums = (0 until numsArray.length()).map { numsArray.getInt(it) }
                 val bonus = obj.optInt("bonus_no", -1)
-                result.add(HistoricalDraw(drawNo, nums, bonus))
+                val date = obj.optString("date", "").take(10) // "2026-08-15T00:00:00Z" -> "2026-08-15"
+                result.add(HistoricalDraw(drawNo, nums, bonus, date))
             }
             result
         } finally {
