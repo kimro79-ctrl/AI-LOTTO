@@ -83,17 +83,25 @@ fun AnalysisScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "AI 스마트 로또 분석",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontSize = 22.sp,
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                    Column {
+                        Text(
+                            text = "AI로또 6/45",
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.Bold,
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontSize = 21.sp,
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                                )
                             )
                         )
-                    )
+                        Text(
+                            text = "스마트 로또 분석",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFFF8FAFC)
@@ -336,7 +344,7 @@ fun AppGuideDialog(onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "👋 AI 스마트 로또 분석 사용법",
+                        text = "👋 AI로또 6/45 사용법",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
