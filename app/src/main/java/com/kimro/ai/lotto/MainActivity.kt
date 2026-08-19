@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
                                         screen.icon,
                                         contentDescription = screen.title,
                                         tint = tint,
-                                        modifier = Modifier.size(23.dp)
+                                        modifier = Modifier.size(26.dp)
                                     )
                                     Spacer(modifier = Modifier.height(1.dp))
                                     Text(
