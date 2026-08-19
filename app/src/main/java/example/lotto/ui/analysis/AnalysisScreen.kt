@@ -86,10 +86,10 @@ fun AnalysisScreen(
                     Column {
                         Text(
                             text = "AI로또 6/45",
-                            fontSize = 26.sp,
+                            fontSize = 21.sp,
                             fontWeight = FontWeight.Bold,
                             style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 26.sp,
+                                fontSize = 21.sp,
                                 brush = Brush.horizontalGradient(
                                     colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
                                 )
@@ -97,7 +97,7 @@ fun AnalysisScreen(
                         )
                         Text(
                             text = "스마트 로또 분석",
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF94A3B8)
                         )
@@ -107,7 +107,7 @@ fun AnalysisScreen(
                     containerColor = Color(0xFFF1F5F9).copy(alpha = 0.92f)
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0),
-                modifier = Modifier.height(68.dp)
+                modifier = Modifier.height(58.dp)
             )
         },
         containerColor = Color.Transparent
