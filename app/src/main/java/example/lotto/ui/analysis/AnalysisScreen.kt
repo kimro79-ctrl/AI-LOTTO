@@ -86,10 +86,10 @@ fun AnalysisScreen(
                     Column {
                         Text(
                             text = "AI로또 6/45",
-                            fontSize = 21.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 21.sp,
+                                fontSize = 17.sp,
                                 brush = Brush.horizontalGradient(
                                     colors = listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
                                 )
@@ -97,7 +97,7 @@ fun AnalysisScreen(
                         )
                         Text(
                             text = "스마트 로또 분석",
-                            fontSize = 12.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF94A3B8)
                         )
@@ -105,11 +105,24 @@ fun AnalysisScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFFF1F5F9).copy(alpha = 0.92f)
-                )
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                modifier = Modifier.height(44.dp)
             )
         },
-        containerColor = Color(0xFFF1F5F9)
+        containerColor = Color.Transparent
     ) { paddingValues ->
+        // 배경을 단색이 아니라 은은한 세로 그라데이션으로 깔아서, 카드와 배경 사이 경계가
+        // 딱딱하게 갈라져 보이지 않고 자연스럽게 이어지도록 한다.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFEBEFF5))
+                    )
+                )
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -261,6 +274,7 @@ fun AnalysisScreen(
                 }
             }
         }
+        } // Box(그라데이션 배경) 종료
     }
 
     if (showConditionDialog) {
