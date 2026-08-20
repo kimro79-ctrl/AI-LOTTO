@@ -161,6 +161,47 @@ class AnalysisViewModel @Inject constructor(
     private val _excludedNumbers = MutableStateFlow(loadNumberSet("excluded_numbers"))
     val excludedNumbers: StateFlow<Set<Int>> = _excludedNumbers.asStateFlow()
 
+    // 몬테카를로 시뮬레이션은 하루 5회까지 광고 없이 무료로 쓸 수 있고, 그 이후는 매번 광고를 봐야 한다.
+    // 자정이 지나면 자동으로 다시 5회가 채워진다. SharedPreferences에 "오늘 날짜"와 "오늘 쓴 횟수"를 저장해서
+    // 앱을 껐다 켜도, 하루가 지났는지 정확히 판단한다.
+    private val simCreditPrefs = application.getSharedPreferences("sim_credit_prefs", Context.MODE_PRIVATE)
+    private val dailyFreeSimLimit = 5
+
+    private val _freeSimUsesToday = MutableStateFlow(0)
+    val freeSimUsesToday: StateFlow<Int> = _freeSimUsesToday.asStateFlow()
+
+    init {
+        refreshFreeSimUsesForToday()
+    }
+
+    private fun todayDateKey(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+
+    /** 저장된 날짜가 오늘이 아니면(자정이 지났으면) 사용 횟수를 0으로 리셋한다. */
+    private fun refreshFreeSimUsesForToday() {
+        val today = todayDateKey()
+        val savedDate = simCreditPrefs.getString("free_sim_date", "")
+        if (savedDate != today) {
+            simCreditPrefs.edit().putString("free_sim_date", today).putInt("free_sim_used", 0).apply()
+            _freeSimUsesToday.value = 0
+        } else {
+            _freeSimUsesToday.value = simCreditPrefs.getInt("free_sim_used", 0)
+        }
+    }
+
+    /** 오늘 무료 횟수가 남아있으면 1회 소비하고 true(광고 없이 바로 실행), 다 썼으면 false(광고 시청 필요)를 반환한다. */
+    fun consumeFreeSimCredit(): Boolean {
+        refreshFreeSimUsesForToday() // 자정을 넘겼을 수도 있으니 매번 날짜를 다시 확인한다.
+        return if (_freeSimUsesToday.value < dailyFreeSimLimit) {
+            val newCount = _freeSimUsesToday.value + 1
+            _freeSimUsesToday.value = newCount
+            simCreditPrefs.edit().putInt("free_sim_used", newCount).apply()
+            true
+        } else {
+            false
+        }
+    }
+
     private fun loadNumberSet(key: String): Set<Int> {
         val raw = prefs.getString(key, "") ?: ""
         if (raw.isBlank()) return emptySet()
