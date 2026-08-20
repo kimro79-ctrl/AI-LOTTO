@@ -258,6 +258,7 @@ fun AnalysisScreen(
 
                 itemsIndexed(numberSets) { index, set ->
                     LottoSetCard(
+                        viewModel = viewModel,
                         setIndex = index + 1,
                         numbers = set,
                         initiallyExpanded = index == 0,
@@ -285,6 +286,7 @@ fun AnalysisScreen(
 
     if (showManualPickDialog) {
         ManualPickDialog(
+            viewModel = viewModel,
             onSaveClick = { numbers -> viewModel.saveSingleSet(numbers) },
             onDismiss = { showManualPickDialog = false }
         )
@@ -1191,10 +1193,12 @@ fun ConditionChangeBanner(
  */
 @Composable
 fun ManualPickDialog(
+    viewModel: AnalysisViewModel,
     onSaveClick: (List<Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val freeSimUsesToday by viewModel.freeSimUsesToday.collectAsState()
     var selectedNumbers by remember { mutableStateOf(setOf<Int>()) }
     var saved by remember { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
@@ -1443,15 +1447,19 @@ fun ManualPickDialog(
 
                         OutlinedButton(
                             onClick = {
-                                val activity = context as? android.app.Activity
-                                if (activity != null) {
-                                    com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
-                                        activity = activity,
-                                        onRewardEarned = { showSimulationDialog = true },
-                                        onAdUnavailable = { showSimulationDialog = true }
-                                    )
-                                } else {
+                                if (viewModel.consumeFreeSimCredit()) {
                                     showSimulationDialog = true
+                                } else {
+                                    val activity = context as? android.app.Activity
+                                    if (activity != null) {
+                                        com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
+                                            activity = activity,
+                                            onRewardEarned = { showSimulationDialog = true },
+                                            onAdUnavailable = { showSimulationDialog = true }
+                                        )
+                                    } else {
+                                        showSimulationDialog = true
+                                    }
                                 }
                             },
                             modifier = Modifier
@@ -1459,13 +1467,20 @@ fun ManualPickDialog(
                                 .height(44.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
+                            val remainingToday = (5 - freeSimUsesToday).coerceAtLeast(0)
                             Text(
-                                text = "🎬 광고 보고 시뮬레이션 실행",
+                                text = if (remainingToday > 0) "💰 시뮬레이션 실행 (오늘 무료 ${remainingToday}회 남음)" else "🎬 광고 보고 시뮬레이션 실행",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED)
                             )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "하루 5회까지 무료, 이후엔 광고 시청 후 이용할 수 있어요",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8)
+                        )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1817,12 +1832,14 @@ fun FavoriteExcludeDialog(
  */
 @Composable
 fun LottoSetCard(
+    viewModel: AnalysisViewModel,
     setIndex: Int,
     numbers: List<Int>,
     initiallyExpanded: Boolean = false,
     onSaveClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val freeSimUsesToday by viewModel.freeSimUsesToday.collectAsState()
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
@@ -1938,15 +1955,19 @@ fun LottoSetCard(
 
                 OutlinedButton(
                     onClick = {
-                        val activity = context as? android.app.Activity
-                        if (activity != null) {
-                            com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
-                                activity = activity,
-                                onRewardEarned = { showSimulationDialog = true },
-                                onAdUnavailable = { showSimulationDialog = true }
-                            )
-                        } else {
+                        if (viewModel.consumeFreeSimCredit()) {
                             showSimulationDialog = true
+                        } else {
+                            val activity = context as? android.app.Activity
+                            if (activity != null) {
+                                com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
+                                    activity = activity,
+                                    onRewardEarned = { showSimulationDialog = true },
+                                    onAdUnavailable = { showSimulationDialog = true }
+                                )
+                            } else {
+                                showSimulationDialog = true
+                            }
                         }
                     },
                     modifier = Modifier
@@ -1954,13 +1975,20 @@ fun LottoSetCard(
                         .height(42.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
+                    val remainingToday = (5 - freeSimUsesToday).coerceAtLeast(0)
                     Text(
-                        text = "🎬 광고 보고 시뮬레이션 실행",
+                        text = if (remainingToday > 0) "💰 시뮬레이션 실행 (오늘 무료 ${remainingToday}회 남음)" else "🎬 광고 보고 시뮬레이션 실행",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF7C3AED)
                     )
                 }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "하루 5회까지 무료, 이후엔 광고 시청 후 이용할 수 있어요",
+                    fontSize = 9.sp,
+                    color = Color(0xFF94A3B8)
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
