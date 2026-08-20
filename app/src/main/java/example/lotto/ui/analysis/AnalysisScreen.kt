@@ -149,6 +149,7 @@ fun AnalysisScreen(
                     onGenerateClick = {
                         when (selectedCondition) {
                             CONDITION_SAKAI -> viewModel.generateSakaiNumbers(selectedSetCount)
+                            CONDITION_CARRYOVER -> viewModel.generateCarryoverNumbers(selectedSetCount)
                             CONDITION_RANDOM -> viewModel.generateRandomNumbers(selectedSetCount)
                             CONDITION_AC_FILTER -> viewModel.generateAcFilteredNumbers(selectedSetCount)
                             CONDITION_BALANCE_FILTER -> viewModel.generateBalancedNumbers(selectedSetCount)
@@ -160,7 +161,8 @@ fun AnalysisScreen(
                     excludedNumbers = excludedNumbers,
                     onOpenFavoriteExcludeDialog = { showFavoriteExcludeDialog = true },
                     isGenerating = isGenerating,
-                    sakaiInfoMessage = sakaiInfoMessage
+                    sakaiInfoMessage = sakaiInfoMessage,
+                    currentCondition = selectedCondition
                 )
             }
 
@@ -928,7 +930,8 @@ fun SmartPatternAnalysisSection(
     excludedNumbers: Set<Int> = emptySet(),
     onOpenFavoriteExcludeDialog: () -> Unit = {},
     isGenerating: Boolean = false,
-    sakaiInfoMessage: String? = null
+    sakaiInfoMessage: String? = null,
+    currentCondition: String = ""
 ) {
     Card(
         modifier = Modifier
@@ -1082,7 +1085,7 @@ fun SmartPatternAnalysisSection(
                 }
             }
 
-            if (!sakaiInfoMessage.isNullOrBlank()) {
+            if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER) && !sakaiInfoMessage.isNullOrBlank()) {
                 Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "📊 $sakaiInfoMessage",
@@ -2978,6 +2981,39 @@ fun LottoBall(number: Int, size: Int = 34) {
     }
 }
 
+private fun conditionEmoji(condition: String): String = when (condition) {
+    CONDITION_ADVANCED -> "🎯"
+    CONDITION_SAKAI -> "🔥"
+    CONDITION_CARRYOVER -> "🔁"
+    CONDITION_RANDOM -> "🎲"
+    CONDITION_AC_FILTER -> "🧮"
+    CONDITION_BALANCE_FILTER -> "⚖️"
+    CONDITION_END_DIGIT_FILTER -> "🔢"
+    else -> "✨"
+}
+
+private fun conditionSubtitle(condition: String): String = when (condition) {
+    CONDITION_ADVANCED -> "홀짝·고저·구간분포 등 7가지 통계 로직을 한번에 적용"
+    CONDITION_SAKAI -> "최근 회차 출현 패턴을 반영해 트렌드 위주로 조합"
+    CONDITION_CARRYOVER -> "최근 3주 당첨번호를 이월수로 1~2개 반영 (참고용)"
+    CONDITION_RANDOM -> "필터 없이 완전 무작위로 6개 번호 추첨"
+    CONDITION_AC_FILTER -> "번호 간 차이값 다양성(AC값)이 높은 조합만 선별"
+    CONDITION_BALANCE_FILTER -> "홀짝·고저 비율이 한쪽으로 치우치지 않게 조정"
+    CONDITION_END_DIGIT_FILTER -> "끝자리 중복과 연속번호를 줄인 조합으로 구성"
+    else -> ""
+}
+
+private fun conditionAccentColor(condition: String): Color = when (condition) {
+    CONDITION_ADVANCED -> Color(0xFF7C3AED)
+    CONDITION_SAKAI -> Color(0xFFEA580C)
+    CONDITION_CARRYOVER -> Color(0xFF16A34A)
+    CONDITION_RANDOM -> Color(0xFF64748B)
+    CONDITION_AC_FILTER -> Color(0xFF0D9488)
+    CONDITION_BALANCE_FILTER -> Color(0xFF0284C7)
+    CONDITION_END_DIGIT_FILTER -> Color(0xFFDB2777)
+    else -> Color(0xFF0284C7)
+}
+
 @Composable
 fun ConditionSelectDialog(
     currentCondition: String,
@@ -2987,6 +3023,7 @@ fun ConditionSelectDialog(
     val conditions = listOf(
         CONDITION_ADVANCED,
         CONDITION_SAKAI,
+        CONDITION_CARRYOVER,
         CONDITION_RANDOM,
         CONDITION_AC_FILTER,
         CONDITION_BALANCE_FILTER,
@@ -3006,27 +3043,55 @@ fun ConditionSelectDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 conditions.forEach { condition ->
                     val isSelected = condition == currentCondition
+                    val emoji = conditionEmoji(condition)
+                    val subtitle = conditionSubtitle(condition)
+                    val accent = conditionAccentColor(condition)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) Color(0xFFE0F2FE) else Color.Transparent)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) accent.copy(alpha = 0.12f) else Color.Transparent)
                             .clickable { onSelect(condition) }
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = condition,
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) Color(0xFF0284C7) else Color(0xFF334155)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(accent.copy(alpha = if (isSelected) 0.9f else 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emoji, fontSize = 14.sp)
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = condition,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) accent else Color(0xFF334155)
+                                )
+                                if (subtitle.isNotBlank()) {
+                                    Text(
+                                        text = subtitle,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF94A3B8),
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                        }
                         if (isSelected) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = Color(0xFF0284C7),
+                                tint = accent,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
