@@ -292,10 +292,16 @@ class AnalysisViewModel @Inject constructor(
         // 즐겨찾기와 기피 목록을 제외한 나머지 후보 번호 풀
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
 
+        // 조합끼리 전부 "저구간 위주"로 비슷하게 나오는 걸 막기 위한 구간 앵커.
+        // 각 조합마다 최소 1개는 지정된 구간에서 나오도록 강제해서, setCount개 전체가 골고루 퍼지게 한다.
+        // 패턴: [1~15, 1~15, 10~30, 10~30, 전체 무작위] 를 순서대로 반복 (5개면 1번, 10개면 2번 돈다).
+        val anchorPattern = listOf(1..15, 1..15, 10..30, 10..30, 1..45)
+
         for (i in 0 until setCount) {
             var validSet = false
             var resultSet = mutableSetOf<Int>()
             var attempts = 0
+            val anchorRange = anchorPattern[i % anchorPattern.size]
 
             // 즐겨찾기 번호가 홀짝/고저 조건과 충돌하면 무한루프에 빠질 수 있어 시도 횟수에 상한을 둔다.
             while (!validSet && attempts < 500) {
@@ -329,7 +335,10 @@ class AnalysisViewModel @Inject constructor(
                 val endDigits = sortedList.map { it % 10 }
                 val hasTooManySameEndDigits = endDigits.groupBy { it }.any { it.value.size >= 3 }
 
-                if (isOddEvenValid && isHighLowValid && !hasTooManySameEndDigits) {
+                // 이 조합에 배정된 구간(anchorRange) 안의 번호가 최소 1개는 있는지 확인 (전체 무작위 구간은 항상 통과).
+                val hasAnchorNumber = anchorRange == 1..45 || sortedList.any { it in anchorRange }
+
+                if (isOddEvenValid && isHighLowValid && !hasTooManySameEndDigits && hasAnchorNumber) {
                     validSet = true
                 }
             }
