@@ -125,6 +125,7 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 // 이제부터는 반드시 이 상수들만 사용한다.
 const val CONDITION_ADVANCED = "고도화 종합 분석 (7대 로직 적용)"
 const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
+const val CONDITION_CARRYOVER = "이월수 분석 (최근 3주 당첨번호 반영)"
 const val CONDITION_RANDOM = "완전 무작위 추첨 (일반 자동)"
 const val CONDITION_AC_FILTER = "AC값(번호 복잡도) 기반 필터링"
 const val CONDITION_BALANCE_FILTER = "홀짝 / 고저 균형 필터링"
@@ -338,6 +339,74 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 이월수 분석: 최근 3주(3회차) 당첨번호에 나왔던 번호들을 "이월수" 후보로 삼아
+     * 조합마다 1~2개씩 강제로 포함시키는 방식이다. "직전 회차 번호가 다음 회차에도 또 나온다"는
+     * 통념에서 나온 전통적인 선택 기법이다.
+     * ⚠️ 사카이 분석과 마찬가지로 로또는 매회 완전 독립 추첨이라 당첨 확률을 높인다는 통계적 근거는 없다 -
+     * 예전부터 통용되는 "참고용 선택 기법"일 뿐이다.
+     */
+    fun generateCarryoverNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+        viewModelScope.launch {
+            try {
+                val allDraws = fetchHistoricalDraws()
+                val recentDraws = allDraws.sortedByDescending { it.drawNo }.take(3)
+
+                if (recentDraws.isEmpty()) {
+                    _saveMessage.value = "과거 데이터를 불러오지 못해 이월수 분석을 적용할 수 없습니다."
+                    _isGenerating.value = false
+                    return@launch
+                }
+
+                val favorites = _favoriteNumbers.value
+                val excluded = _excludedNumbers.value
+
+                // 최근 3주 당첨번호를 전부 모아 중복 제거한 게 "이월수" 후보 풀
+                val carryoverPool = recentDraws.flatMap { it.numbers }.distinct().filter { it !in excluded }
+                val fullPool = (1..45).filter { it !in excluded }
+
+                val generatedSets = mutableListOf<List<Int>>()
+                repeat(setCount) {
+                    val resultSet = mutableSetOf<Int>()
+                    resultSet.addAll(favorites) // 즐겨찾기 번호는 항상 강제 포함
+
+                    // 이월수 1~2개를 강제로 포함 (즐겨찾기로 이미 6개가 다 찼으면 생략)
+                    if (carryoverPool.isNotEmpty() && resultSet.size < 6) {
+                        val carryoverCount = (1..2).random().coerceAtMost(6 - resultSet.size)
+                        resultSet.addAll(carryoverPool.shuffled().take(carryoverCount))
+                    }
+
+                    val poolIterator = fullPool.filter { it !in resultSet }.shuffled().iterator()
+                    while (resultSet.size < 6 && poolIterator.hasNext()) {
+                        resultSet.add(poolIterator.next())
+                    }
+
+                    generatedSets.add(resultSet.sorted())
+                }
+
+                _numberSets.value = generatedSets
+                _sakaiInfoMessage.value = "최근 3주(${recentDraws.size}회차) 당첨번호 중 이월수 후보 ${carryoverPool.size}개 반영 · 참고용 기법이며 당첨 확률과는 무관해요"
+            } catch (e: Exception) {
+                _saveMessage.value = "과거 데이터를 불러오지 못해 이월수 분석을 적용할 수 없습니다."
+            } finally {
+                _isGenerating.value = false
+            }
+        }
+    }
+
+    /** AC값(번호 복잡도) 계산: 모든 쌍의 차이값 중 서로 다른 값의 개수 - (n-1). 0~10 범위, 높을수록 무작위성이 높다. */
+    private fun computeAcValue(sortedList: List<Int>): Int {
+        val diffs = mutableSetOf<Int>()
+        for (a in sortedList.indices) {
+            for (b in a + 1 until sortedList.size) {
+                diffs.add(sortedList[b] - sortedList[a])
+            }
+        }
+        return diffs.size - (sortedList.size - 1)
+    }
+
     fun generateSmartNumbers(setCount: Int) {
         val generatedSets = mutableListOf<List<Int>>()
         val favorites = _favoriteNumbers.value
@@ -357,7 +426,8 @@ class AnalysisViewModel @Inject constructor(
             val anchorRange = anchorPattern[i % anchorPattern.size]
 
             // 즐겨찾기 번호가 홀짝/고저 조건과 충돌하면 무한루프에 빠질 수 있어 시도 횟수에 상한을 둔다.
-            while (!validSet && attempts < 500) {
+            // 7대 로직(홀짝/고저/연속/끝수/총합/구간분포/AC값) + 구간 앵커까지 모두 검증하므로 상한을 넉넉히 둔다.
+            while (!validSet && attempts < 8000) {
                 attempts++
                 resultSet.clear()
                 resultSet.addAll(favorites) // 즐겨찾기 번호는 항상 포함
@@ -388,10 +458,25 @@ class AnalysisViewModel @Inject constructor(
                 val endDigits = sortedList.map { it % 10 }
                 val hasTooManySameEndDigits = endDigits.groupBy { it }.any { it.value.size >= 3 }
 
-                // 이 조합에 배정된 구간(anchorRange) 안의 번호가 최소 1개는 있는지 확인 (전체 무작위 구간은 항상 통과).
-                val hasAnchorNumber = anchorRange == 1..45 || sortedList.any { it in anchorRange }
+                // ⑤ 총합 적정구간: 6개 번호 합이 통계적으로 흔한 100~175 구간에 들어야 함.
+                val sum = sortedList.sum()
+                val isSumValid = sum in 100..175
 
-                if (isOddEvenValid && isHighLowValid && !hasTooManySameEndDigits && hasAnchorNumber) {
+                // ⑥ 구간 분포: 1~45를 5개 구간(1~9,10~18,19~27,28~36,37~45)으로 나눠 최소 3개 구간 이상에 걸쳐야 함.
+                val sections = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
+                val distinctSectionCount = sections.count { range -> sortedList.any { it in range } }
+                val isSectionValid = distinctSectionCount >= 3
+
+                // ⑦ AC값(번호 복잡도): 값이 낮으면(패턴이 규칙적) 제외, 5 이상이면 무작위성이 충분한 것으로 간주.
+                val acValue = computeAcValue(sortedList)
+                val isAcValid = acValue >= 5
+
+                // 이 조합에 배정된 구간(anchorRange)이 "첫 번째 자리"(정렬 후 가장 작은 번호)에 오는지 확인.
+                // 전체 무작위 구간(1..45)은 항상 통과.
+                val hasAnchorNumber = anchorRange == 1..45 || sortedList.first() in anchorRange
+
+                if (isOddEvenValid && isHighLowValid && !hasConsecutive && !hasTooManySameEndDigits &&
+                    isSumValid && isSectionValid && isAcValid && hasAnchorNumber) {
                     validSet = true
                 }
             }
