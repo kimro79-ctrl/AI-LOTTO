@@ -1485,7 +1485,7 @@ fun ManualPickDialog(
                         Text(
                             text = "오늘 첫 실행은 광고 시청 후 가능, 이후 4회는 무료예요. 매일 자정에 초기화돼요",
                             fontSize = 10.sp,
-                            color = Color(0xFF94A3B8)
+                            color = Color(0xFF64748B)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1999,7 +1999,7 @@ fun LottoSetCard(
                 Text(
                     text = "오늘 첫 실행은 광고 시청 후 가능, 이후 4회는 무료예요. 매일 자정에 초기화돼요",
                     fontSize = 9.sp,
-                    color = Color(0xFF94A3B8)
+                    color = Color(0xFF64748B)
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -2861,7 +2861,7 @@ fun AnalysisReportSection(analysis: LottoSetAnalysis) {
         Text(
             text = "⚠️ 이 점수는 번호 배열이 통계적으로 얼마나 자연스러운지를 7대 로직 기준으로 계산한 참고용 지표입니다. 로또는 매회 완전히 독립적인 무작위 추첨이므로, 이 점수가 높다고 해서 실제 당첨 확률이 올라가는 것은 아닙니다.",
             fontSize = 10.sp,
-            color = Color(0xFF94A3B8),
+            color = Color(0xFFB45309),
             lineHeight = 14.sp
         )
     }
