@@ -161,11 +161,12 @@ class AnalysisViewModel @Inject constructor(
     private val _excludedNumbers = MutableStateFlow(loadNumberSet("excluded_numbers"))
     val excludedNumbers: StateFlow<Set<Int>> = _excludedNumbers.asStateFlow()
 
-    // 몬테카를로 시뮬레이션은 하루 5회까지 광고 없이 무료로 쓸 수 있고, 그 이후는 매번 광고를 봐야 한다.
-    // 자정이 지나면 자동으로 다시 5회가 채워진다. SharedPreferences에 "오늘 날짜"와 "오늘 쓴 횟수"를 저장해서
-    // 앱을 껐다 켜도, 하루가 지났는지 정확히 판단한다.
+    // 몬테카를로 시뮬레이션: 하루 중 "첫 번째" 실행은 무조건 광고를 봐야 하고, 그 광고 하나로 이후 4회는
+    // 무료로 풀린다. 총 5회(광고1+무료4)를 다 쓰면, 그 뒤로는 다시 실행할 때마다 매번 광고를 봐야 한다.
+    // 자정이 지나면 자동으로 리셋된다. SharedPreferences에 "오늘 날짜"와 "오늘 사용 횟수"를 저장해서
+    // 앱을 껐다 켜도 하루가 지났는지 정확히 판단한다.
     private val simCreditPrefs = application.getSharedPreferences("sim_credit_prefs", Context.MODE_PRIVATE)
-    private val dailyFreeSimLimit = 5
+    private val dailyFreeAfterAdCount = 4 // 광고 1번 본 뒤 무료로 주어지는 횟수
 
     private val _freeSimUsesToday = MutableStateFlow(0)
     val freeSimUsesToday: StateFlow<Int> = _freeSimUsesToday.asStateFlow()
@@ -189,10 +190,13 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
-    /** 오늘 무료 횟수가 남아있으면 1회 소비하고 true(광고 없이 바로 실행), 다 썼으면 false(광고 시청 필요)를 반환한다. */
+    /**
+     * 오늘 이미 광고를 한 번 봤고(사용 횟수 1~4) 무료 구간이면 소비하고 true.
+     * 오늘 첫 사용(0회)이거나 5회를 다 썼으면(광고가 필요하면) false를 반환한다.
+     */
     fun consumeFreeSimCredit(): Boolean {
-        refreshFreeSimUsesForToday() // 자정을 넘겼을 수도 있으니 매번 날짜를 다시 확인한다.
-        return if (_freeSimUsesToday.value < dailyFreeSimLimit) {
+        refreshFreeSimUsesForToday()
+        return if (_freeSimUsesToday.value in 1..dailyFreeAfterAdCount) {
             val newCount = _freeSimUsesToday.value + 1
             _freeSimUsesToday.value = newCount
             simCreditPrefs.edit().putInt("free_sim_used", newCount).apply()
@@ -200,6 +204,14 @@ class AnalysisViewModel @Inject constructor(
         } else {
             false
         }
+    }
+
+    /** 광고를 끝까지 보고 나서 호출한다. 오늘 사용 횟수를 1 늘린다(5를 넘기면 그대로 5에 고정해서 계속 광고 구간을 유지). */
+    fun recordAdWatchedSim() {
+        refreshFreeSimUsesForToday()
+        val newCount = (_freeSimUsesToday.value + 1).coerceAtMost(dailyFreeAfterAdCount + 1)
+        _freeSimUsesToday.value = newCount
+        simCreditPrefs.edit().putInt("free_sim_used", newCount).apply()
     }
 
     private fun loadNumberSet(key: String): Set<Int> {
