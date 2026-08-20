@@ -1454,7 +1454,10 @@ fun ManualPickDialog(
                                     if (activity != null) {
                                         com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
                                             activity = activity,
-                                            onRewardEarned = { showSimulationDialog = true },
+                                            onRewardEarned = {
+                                                viewModel.recordAdWatchedSim()
+                                                showSimulationDialog = true
+                                            },
                                             onAdUnavailable = { showSimulationDialog = true }
                                         )
                                     } else {
@@ -1467,9 +1470,12 @@ fun ManualPickDialog(
                                 .height(44.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            val remainingToday = (5 - freeSimUsesToday).coerceAtLeast(0)
                             Text(
-                                text = if (remainingToday > 0) "💰 시뮬레이션 실행 (오늘 무료 ${remainingToday}회 남음)" else "🎬 광고 보고 시뮬레이션 실행",
+                                text = when {
+                                    freeSimUsesToday == 0 -> "🎬 광고 보고 무료 이용권 4회 받기"
+                                    freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
+                                    else -> "🎬 광고 보고 시뮬레이션 실행"
+                                },
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED)
@@ -1477,7 +1483,7 @@ fun ManualPickDialog(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "하루 5회까지 무료, 이후엔 광고 시청 후 이용할 수 있어요",
+                            text = "오늘 첫 실행은 광고 시청 후 가능, 이후 4회는 무료예요. 매일 자정에 초기화돼요",
                             fontSize = 10.sp,
                             color = Color(0xFF94A3B8)
                         )
@@ -1962,7 +1968,10 @@ fun LottoSetCard(
                             if (activity != null) {
                                 com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
                                     activity = activity,
-                                    onRewardEarned = { showSimulationDialog = true },
+                                    onRewardEarned = {
+                                        viewModel.recordAdWatchedSim()
+                                        showSimulationDialog = true
+                                    },
                                     onAdUnavailable = { showSimulationDialog = true }
                                 )
                             } else {
@@ -1975,9 +1984,12 @@ fun LottoSetCard(
                         .height(42.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    val remainingToday = (5 - freeSimUsesToday).coerceAtLeast(0)
                     Text(
-                        text = if (remainingToday > 0) "💰 시뮬레이션 실행 (오늘 무료 ${remainingToday}회 남음)" else "🎬 광고 보고 시뮬레이션 실행",
+                        text = when {
+                            freeSimUsesToday == 0 -> "🎬 광고 보고 무료 이용권 4회 받기"
+                            freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
+                            else -> "🎬 광고 보고 시뮬레이션 실행"
+                        },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF7C3AED)
@@ -1985,7 +1997,7 @@ fun LottoSetCard(
                 }
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "하루 5회까지 무료, 이후엔 광고 시청 후 이용할 수 있어요",
+                    text = "오늘 첫 실행은 광고 시청 후 가능, 이후 4회는 무료예요. 매일 자정에 초기화돼요",
                     fontSize = 9.sp,
                     color = Color(0xFF94A3B8)
                 )
