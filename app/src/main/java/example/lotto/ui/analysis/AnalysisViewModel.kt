@@ -260,6 +260,54 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    /** 즐겨찾기·기피 번호를 한 번에 전부 초기화한다. */
+    fun resetFavoriteAndExcluded() {
+        _favoriteNumbers.value = emptySet()
+        _excludedNumbers.value = emptySet()
+        saveNumberSet("favorite_numbers", emptySet())
+        saveNumberSet("excluded_numbers", emptySet())
+    }
+
+    // 관심번호 워치리스트: 특정 번호를 여러 회차에 걸쳐 지속적으로 "관심 있게" 지켜보고 싶을 때 쓰는 순수 기록 기능.
+    // 즐겨찾기(생성 로직에 강제 반영됨)와 달리 워치리스트는 번호 생성 로직에는 전혀 개입하지 않고,
+    // 오직 "내가 언제부터 이 번호를 지켜보고 있었는지"만 기록해 결과 화면에서 가볍게 하이라이트해주는 용도다.
+    private val _watchlistNumbers = MutableStateFlow(loadWatchlist())
+    val watchlistNumbers: StateFlow<Map<Int, Long>> = _watchlistNumbers.asStateFlow()
+
+    private fun loadWatchlist(): Map<Int, Long> {
+        val raw = prefs.getString("watchlist_numbers", "") ?: ""
+        if (raw.isBlank()) return emptyMap()
+        return raw.split(",").mapNotNull { entry ->
+            val parts = entry.split(":")
+            val number = parts.getOrNull(0)?.trim()?.toIntOrNull()
+            val timestamp = parts.getOrNull(1)?.trim()?.toLongOrNull()
+            if (number != null && timestamp != null) number to timestamp else null
+        }.toMap()
+    }
+
+    private fun saveWatchlist(map: Map<Int, Long>) {
+        prefs.edit().putString("watchlist_numbers", map.entries.joinToString(",") { "${it.key}:${it.value}" }).apply()
+    }
+
+    /** 번호를 워치리스트에 추가/제거한다. 추가 시점의 시각을 저장해 "N주째 관심 중"을 계산할 수 있게 한다. */
+    fun toggleWatchlistNumber(number: Int) {
+        val current = _watchlistNumbers.value
+        val newMap = if (number in current) current - number else current + (number to System.currentTimeMillis())
+        _watchlistNumbers.value = newMap
+        saveWatchlist(newMap)
+    }
+
+    fun resetWatchlist() {
+        _watchlistNumbers.value = emptyMap()
+        saveWatchlist(emptyMap())
+    }
+
+    /** 워치리스트에 등록한 지 몇 주째인지 계산한다 (등록 당일도 1주차로 표시). */
+    fun watchlistWeeksSince(addedAtMillis: Long): Int {
+        val diffMillis = (System.currentTimeMillis() - addedAtMillis).coerceAtLeast(0)
+        return (diffMillis / (7L * 24 * 60 * 60 * 1000)).toInt() + 1
+    }
+
     fun setCondition(condition: String) {
         _selectedCondition.value = condition
     }
