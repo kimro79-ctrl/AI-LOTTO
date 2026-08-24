@@ -54,11 +54,13 @@ fun AnalysisScreen(
     val saveMessage by viewModel.saveMessage.collectAsState()
     val favoriteNumbers by viewModel.favoriteNumbers.collectAsState()
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
+    val watchlistNumbers by viewModel.watchlistNumbers.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
     var showLogicInfoDialog by remember { mutableStateOf(false) }
     var showManualPickDialog by remember { mutableStateOf(false) }
     var showFavoriteExcludeDialog by remember { mutableStateOf(false) }
+    var showWatchlistDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
 
     // 앱 사용법 안내 팝업 - "오늘 하루 보지 않기"를 체크하지 않으면 앱을 켤 때마다 다시 뜬다.
@@ -160,6 +162,8 @@ fun AnalysisScreen(
                     favoriteNumbers = favoriteNumbers,
                     excludedNumbers = excludedNumbers,
                     onOpenFavoriteExcludeDialog = { showFavoriteExcludeDialog = true },
+                    watchlistCount = watchlistNumbers.size,
+                    onOpenWatchlistDialog = { showWatchlistDialog = true },
                     isGenerating = isGenerating,
                     sakaiInfoMessage = sakaiInfoMessage,
                     currentCondition = selectedCondition
@@ -300,7 +304,18 @@ fun AnalysisScreen(
             excludedNumbers = excludedNumbers,
             onToggleFavorite = { viewModel.toggleFavoriteNumber(it) },
             onToggleExcluded = { viewModel.toggleExcludedNumber(it) },
+            onReset = { viewModel.resetFavoriteAndExcluded() },
             onDismiss = { showFavoriteExcludeDialog = false }
+        )
+    }
+
+    if (showWatchlistDialog) {
+        WatchlistDialog(
+            watchlistNumbers = watchlistNumbers,
+            onToggle = { viewModel.toggleWatchlistNumber(it) },
+            onReset = { viewModel.resetWatchlist() },
+            weeksSince = { viewModel.watchlistWeeksSince(it) },
+            onDismiss = { showWatchlistDialog = false }
         )
     }
 
@@ -929,6 +944,8 @@ fun SmartPatternAnalysisSection(
     favoriteNumbers: Set<Int> = emptySet(),
     excludedNumbers: Set<Int> = emptySet(),
     onOpenFavoriteExcludeDialog: () -> Unit = {},
+    watchlistCount: Int = 0,
+    onOpenWatchlistDialog: () -> Unit = {},
     isGenerating: Boolean = false,
     sakaiInfoMessage: String? = null,
     currentCondition: String = ""
@@ -1055,6 +1072,37 @@ fun SmartPatternAnalysisSection(
                     )
                 }
                 Text(text = "›", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 관심번호 워치리스트 진입 영역 - 즐겨찾기와 달리 생성 로직에는 개입하지 않고, 여러 회차에 걸쳐
+            // "지켜보고 싶은 번호"를 기록만 해두는 용도. 결과 조합에 포함되면 가볍게 하이라이트만 해준다.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF0FDF4))
+                    .clickable { onOpenWatchlistDialog() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "🔎 관심번호 워치리스트",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF166534)
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = if (watchlistCount == 0) "등록 안 함 · 탭해서 지켜볼 번호 등록하기" else "${watchlistCount}개 등록됨 · 여러 회차에 걸쳐 계속 지켜봐요",
+                        fontSize = 11.sp,
+                        color = Color(0xFF15803D)
+                    )
+                }
+                Text(text = "›", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF15803D))
             }
 
             Button(
@@ -1546,11 +1594,32 @@ fun FavoriteExcludeDialog(
     excludedNumbers: Set<Int>,
     onToggleFavorite: (Int) -> Unit,
     onToggleExcluded: (Int) -> Unit,
+    onReset: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var isFavoriteMode by remember { mutableStateOf(true) }
     var isLoadingRecommendation by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("전체 초기화", fontWeight = FontWeight.Bold) },
+            text = { Text("즐겨찾기·기피 번호를 모두 지울까요? 이 작업은 되돌릴 수 없어요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onReset()
+                    showResetConfirm = false
+                }) {
+                    Text("초기화", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("취소") }
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1578,8 +1647,15 @@ fun FavoriteExcludeDialog(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF0F172A)
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (favoriteNumbers.isNotEmpty() || excludedNumbers.isNotEmpty()) {
+                            TextButton(onClick = { showResetConfirm = true }) {
+                                Text("초기화", fontSize = 12.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                        }
                     }
                 }
                 HorizontalDivider(color = Color(0xFFF1F5F9))
@@ -1837,6 +1913,162 @@ fun FavoriteExcludeDialog(
 }
 
 /**
+ * 관심번호 워치리스트 설정 팝업. 즐겨찾기/기피와 달리 번호 생성 로직에는 전혀 개입하지 않고,
+ * "이 번호를 여러 회차에 걸쳐 지켜보고 싶다"는 사용자의 의도만 기록한다. 등록한 지 몇 주째인지 같이 보여준다.
+ */
+@Composable
+fun WatchlistDialog(
+    watchlistNumbers: Map<Int, Long>,
+    onToggle: (Int) -> Unit,
+    onReset: () -> Unit = {},
+    weeksSince: (Long) -> Int,
+    onDismiss: () -> Unit
+) {
+    var showResetConfirm by remember { mutableStateOf(false) }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("워치리스트 초기화", fontWeight = FontWeight.Bold) },
+            text = { Text("지켜보던 번호를 모두 지울까요? 이 작업은 되돌릴 수 없어요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onReset()
+                    showResetConfirm = false
+                }) {
+                    Text("초기화", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("취소") }
+            }
+        )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(horizontal = 12.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🔎 관심번호 워치리스트",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (watchlistNumbers.isNotEmpty()) {
+                            TextButton(onClick = { showResetConfirm = true }) {
+                                Text("초기화", fontSize = 12.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "번호를 탭해서 등록/해제하세요. 생성 조합에는 영향을 주지 않고, 결과에 포함되면 표시만 해드려요.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 17.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // 1~45번 그리드
+                    val rows = (1..45).chunked(9)
+                    rows.forEach { rowNumbers ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            rowNumbers.forEach { number ->
+                                val isWatched = number in watchlistNumbers
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(CircleShape)
+                                        .background(if (isWatched) Color(0xFF16A34A) else Color(0xFFF1F5F9))
+                                        .clickable { onToggle(number) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = number.toString(),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isWatched) Color.White else Color(0xFF475569)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (watchlistNumbers.isEmpty()) {
+                        Text(
+                            text = "아직 등록한 번호가 없어요.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    } else {
+                        Text(
+                            text = "등록 현황",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF334155)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        watchlistNumbers.entries.sortedBy { it.key }.forEach { (number, addedAt) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "${number}번", fontSize = 13.sp, color = Color(0xFF0F172A))
+                                Text(
+                                    text = "${weeksSince(addedAt)}주째 지켜보는 중",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF16A34A)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
  * 조합 1개를 보여주는 카드. 우측 화살표를 누르면 통계 분석 리포트가 펼쳐진다.
  */
 @Composable
@@ -1849,6 +2081,7 @@ fun LottoSetCard(
 ) {
     val context = LocalContext.current
     val freeSimUsesToday by viewModel.freeSimUsesToday.collectAsState()
+    val watchlistNumbers by viewModel.watchlistNumbers.collectAsState()
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     var saved by remember(numbers) { mutableStateOf(false) }
     var showSimulationDialog by remember { mutableStateOf(false) }
@@ -1869,18 +2102,40 @@ fun LottoSetCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "${setIndex}세트",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B),
-                    fontSize = 13.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${setIndex}세트",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B),
+                        fontSize = 13.sp
+                    )
+                    if (numbers.any { it in watchlistNumbers }) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "🔎 관심번호 포함",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF16A34A)
+                        )
+                    }
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     numbers.forEach { number ->
-                        LottoBall(number = number, size = 32)
+                        Box {
+                            LottoBall(number = number, size = 32)
+                            if (number in watchlistNumbers) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF16A34A))
+                                )
+                            }
+                        }
                     }
                 }
             }
