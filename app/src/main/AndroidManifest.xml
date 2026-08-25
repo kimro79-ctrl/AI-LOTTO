@@ -17,11 +17,10 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- AdMob 앱 ID. 지금은 구글 공식 테스트 ID이며, 정식 출시 직전에
-             실제 앱 ID(ca-app-pub-8544113192886422~7663744850)로 교체해야 한다. -->
+        <!-- AdMob 실제 앱 ID (2026-08-27 테스트 ID에서 교체함) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-8544113192886422~7663744850"/>
 
         <activity
             android:name=".MainActivity"
