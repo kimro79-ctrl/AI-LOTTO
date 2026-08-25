@@ -14,15 +14,12 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 /**
  * 몬테카를로 시뮬레이션 "실행" 버튼을 누를 때 보여줄 보상형 광고를 관리한다.
  *
- * ⚠️ 지금은 구글 공식 테스트 광고 단위 ID를 쓰고 있다. 실제 서비스 광고 단위 ID
- * (ca-app-pub-8544113192886422/8519174296)는 정식 출시 직전에 아래 REWARDED_AD_UNIT_ID만
- * 바꿔주면 된다. 비공개 테스트 중에 실제 ID를 쓰면 본인이 테스트하다 클릭해서
- * "무효 트래픽"으로 계정이 정지될 위험이 있다.
+ * 실제 서비스 광고 단위 ID(ca-app-pub-8544113192886422/8519174296)로 교체 완료했다 (2026-08-27).
  */
 object RewardedAdManager {
 
-    // 구글 공식 테스트용 보상형 광고 단위 ID (Android). 실제 서비스 시 교체 필요.
-    private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
+    // 실제 서비스용 "몬테카를로 보상형" 광고 단위 ID (Android).
+    private const val REWARDED_AD_UNIT_ID = "ca-app-pub-8544113192886422/8519174296"
 
     private var rewardedAd: RewardedAd? = null
     private var isLoading = false
@@ -34,7 +31,7 @@ object RewardedAdManager {
 
         RewardedAd.load(
             context,
-            TEST_REWARDED_AD_UNIT_ID,
+            REWARDED_AD_UNIT_ID,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
