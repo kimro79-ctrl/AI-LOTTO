@@ -75,11 +75,14 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     // CameraX & ML Kit (QR Scan)
-    implementation("androidx.camera:camera-core:1.3.3")
-    implementation("androidx.camera:camera-camera2:1.3.3")
-    implementation("androidx.camera:camera-lifecycle:1.3.3")
-    implementation("androidx.camera:camera-view:1.3.3")
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    // 2026-08-27: 1.3.3의 네이티브 라이브러리(libimage_processing_util_jni.so)가 16KB 메모리 페이지
+    // 크기를 지원하지 않아 Play Console 심사가 막혀서, 16KB를 지원하는 1.4.1로 올렸다.
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
+    // 같은 이유로 ML Kit 바코드 스캔도 16KB를 지원하는 17.3.0으로 올렸다.
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     // Room DB
     implementation("androidx.room:room-runtime:2.6.1")
