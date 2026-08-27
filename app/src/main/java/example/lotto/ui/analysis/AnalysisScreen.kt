@@ -84,6 +84,8 @@ fun AnalysisScreen(
     // 몬테카를로 시뮬레이션 버튼을 눌렀을 때 대기 없이 바로 뜨도록, 화면 진입 시 미리 광고를 받아둔다.
     LaunchedEffect(Unit) {
         com.kimro.ai.lotto.ads.RewardedAdManager.preload(context)
+        com.kimro.ai.lotto.ads.RewardedAdManager.preload(context, com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_GENETIC_ALGORITHM)
+        com.kimro.ai.lotto.ads.RewardedAdManager.preload(context, com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_EXPECTED_VALUE)
     }
 
     Scaffold(
@@ -149,14 +151,42 @@ fun AnalysisScreen(
                         selectedSetCount = count
                     },
                     onGenerateClick = {
-                        when (selectedCondition) {
-                            CONDITION_SAKAI -> viewModel.generateSakaiNumbers(selectedSetCount)
-                            CONDITION_CARRYOVER -> viewModel.generateCarryoverNumbers(selectedSetCount)
-                            CONDITION_RANDOM -> viewModel.generateRandomNumbers(selectedSetCount)
-                            CONDITION_AC_FILTER -> viewModel.generateAcFilteredNumbers(selectedSetCount)
-                            CONDITION_BALANCE_FILTER -> viewModel.generateBalancedNumbers(selectedSetCount)
-                            CONDITION_END_DIGIT_FILTER -> viewModel.generateEndDigitFilteredNumbers(selectedSetCount)
-                            else -> viewModel.generateSmartNumbers(selectedSetCount) // CONDITION_ADVANCED(기본값) 등
+                        // 유전 알고리즘·기댓값 분석은 "AI 고급 분석" 기능이라 매번 보상형 광고를 먼저
+                        // 시청해야 실행된다. 다른 조건들은 지금까지처럼 광고 없이 바로 생성된다.
+                        val adUnitId = when (selectedCondition) {
+                            CONDITION_GENETIC -> com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_GENETIC_ALGORITHM
+                            CONDITION_EXPECTED_VALUE -> com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_EXPECTED_VALUE
+                            else -> null
+                        }
+
+                        fun runGeneration() {
+                            when (selectedCondition) {
+                                CONDITION_SAKAI -> viewModel.generateSakaiNumbers(selectedSetCount)
+                                CONDITION_CARRYOVER -> viewModel.generateCarryoverNumbers(selectedSetCount)
+                                CONDITION_RANDOM -> viewModel.generateRandomNumbers(selectedSetCount)
+                                CONDITION_AC_FILTER -> viewModel.generateAcFilteredNumbers(selectedSetCount)
+                                CONDITION_BALANCE_FILTER -> viewModel.generateBalancedNumbers(selectedSetCount)
+                                CONDITION_END_DIGIT_FILTER -> viewModel.generateEndDigitFilteredNumbers(selectedSetCount)
+                                CONDITION_GENETIC -> viewModel.generateGeneticAlgorithmNumbers(selectedSetCount)
+                                CONDITION_EXPECTED_VALUE -> viewModel.generateExpectedValueNumbers(selectedSetCount)
+                                else -> viewModel.generateSmartNumbers(selectedSetCount) // CONDITION_ADVANCED(기본값) 등
+                            }
+                        }
+
+                        if (adUnitId != null) {
+                            val activity = context as? android.app.Activity
+                            if (activity != null) {
+                                com.kimro.ai.lotto.ads.RewardedAdManager.showAd(
+                                    activity = activity,
+                                    adUnitId = adUnitId,
+                                    onRewardEarned = { runGeneration() },
+                                    onAdUnavailable = { runGeneration() } // 광고가 준비 안 됐으면 기능 자체는 막지 않는다
+                                )
+                            } else {
+                                runGeneration()
+                            }
+                        } else {
+                            runGeneration()
                         }
                     },
                     favoriteNumbers = favoriteNumbers,
@@ -1133,7 +1163,9 @@ fun SmartPatternAnalysisSection(
                 }
             }
 
-            if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER) && !sakaiInfoMessage.isNullOrBlank()) {
+            if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER ||
+                        currentCondition == CONDITION_GENETIC || currentCondition == CONDITION_EXPECTED_VALUE) &&
+                !sakaiInfoMessage.isNullOrBlank()) {
                 Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "📊 $sakaiInfoMessage",
@@ -3236,6 +3268,91 @@ fun LottoBall(number: Int, size: Int = 34) {
     }
 }
 
+private fun premiumConditionDescription(condition: String): String = when (condition) {
+    CONDITION_GENETIC -> "AI가 40세대에 걸쳐 조합을 교차·변이시키며 진화시켜, 7대 로직 조건 충족률이 더 높은 조합을 찾아냅니다."
+    CONDITION_EXPECTED_VALUE -> "생일패턴처럼 사람들이 몰리는 조합을 회피해, 당첨됐을 때 나눠 받을 확률을 줄이고 기대 수령액을 높입니다."
+    else -> ""
+}
+
+@Composable
+private fun PremiumConditionRow(
+    condition: String,
+    isSelected: Boolean,
+    onSelect: () -> Unit
+) {
+    val emoji = if (condition == CONDITION_GENETIC) "🧬" else "💎"
+    val gradient = if (condition == CONDITION_GENETIC) {
+        Brush.horizontalGradient(listOf(Color(0xFF4F46E5), Color(0xFFDB2777)))
+    } else {
+        Brush.horizontalGradient(listOf(Color(0xFF7C3AED), Color(0xFFD97706)))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .then(
+                if (isSelected) Modifier.background(gradient)
+                else Modifier
+                    .border(1.5.dp, Brush.horizontalGradient(listOf(Color(0xFF7C3AED), Color(0xFFD97706))), RoundedCornerShape(14.dp))
+                    .background(Color.White)
+            )
+            .clickable { onSelect() }
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) Color.White.copy(alpha = 0.25f) else Color(0xFFF3E8FF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = emoji, fontSize = 16.sp)
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = condition,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) Color.White else Color(0xFF1E1B4B)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = if (isSelected) Color.White.copy(alpha = 0.25f) else Color(0xFFFEF3C7),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "▶ 시청 후 이용",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White else Color(0xFF92400E),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = premiumConditionDescription(condition),
+                    fontSize = 11.sp,
+                    color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color(0xFF6B7280),
+                    lineHeight = 15.sp
+                )
+            }
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
 private fun conditionEmoji(condition: String): String = when (condition) {
     CONDITION_ADVANCED -> "🎯"
     CONDITION_SAKAI -> "🔥"
@@ -3275,7 +3392,8 @@ fun ConditionSelectDialog(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val conditions = listOf(
+    val premiumConditions = listOf(CONDITION_GENETIC, CONDITION_EXPECTED_VALUE)
+    val basicConditions = listOf(
         CONDITION_ADVANCED,
         CONDITION_SAKAI,
         CONDITION_CARRYOVER,
@@ -3295,8 +3413,36 @@ fun ConditionSelectDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                conditions.forEach { condition ->
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "✨ AI 고급 분석 (광고 시청 후 이용)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF7C3AED),
+                    modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                )
+                premiumConditions.forEach { condition ->
+                    PremiumConditionRow(
+                        condition = condition,
+                        isSelected = condition == currentCondition,
+                        onSelect = { onSelect(condition) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Text(
+                    text = "기본 분석",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                )
+
+                basicConditions.forEach { condition ->
                     val isSelected = condition == currentCondition
                     val emoji = conditionEmoji(condition)
                     val subtitle = conditionSubtitle(condition)
