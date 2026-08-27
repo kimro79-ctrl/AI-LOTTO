@@ -1227,9 +1227,9 @@ fun ConditionChangeBanner(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "적용된 분석 조건",
+                            text = "적용된 분석 조건 · 탭해서 변경",
                             fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.85f)
                         )
                         Text(
                             text = currentCondition,
@@ -1243,23 +1243,23 @@ fun ConditionChangeBanner(
                 Surface(
                     color = Color.White,
                     shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 2.dp
+                    shadowElevation = 3.dp
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = "변경",
+                            text = "분석조건 변경",
                             color = Color(0xFF0D9488),
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
-                        Spacer(modifier = Modifier.width(2.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "›",
                             color = Color(0xFF0D9488),
-                            fontSize = 13.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }

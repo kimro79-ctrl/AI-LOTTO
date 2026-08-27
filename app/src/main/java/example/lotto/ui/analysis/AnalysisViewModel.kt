@@ -126,7 +126,6 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 const val CONDITION_ADVANCED = "고도화 종합 분석 (7대 로직 적용)"
 const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
 const val CONDITION_CARRYOVER = "이월수 분석 (최근 3주 당첨번호 반영)"
-const val CONDITION_LAST_DRAW_EXCLUDE = "직전 회차 제외 분석 (참고용)"
 const val CONDITION_GENETIC = "유전 알고리즘 최적화"
 const val CONDITION_EXPECTED_VALUE = "역발상 기댓값 분석"
 const val CONDITION_RANDOM = "완전 무작위 추첨 (일반 자동)"
