@@ -12,37 +12,41 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 
 /**
- * 몬테카를로 시뮬레이션 "실행" 버튼을 누를 때 보여줄 보상형 광고를 관리한다.
- *
- * 실제 서비스 광고 단위 ID(ca-app-pub-8544113192886422/8519174296)로 교체 완료했다 (2026-08-27).
+ * 앱 안의 여러 "광고 보고 이용하기" 기능(몬테카를로 시뮬레이션, 유전 알고리즘 최적화,
+ * 역발상 기댓값 분석 등)이 각자 다른 광고 단위 ID를 쓰면서도 같은 매니저를 공유할 수 있도록,
+ * 광고 단위 ID별로 로드 상태를 따로 관리한다.
  */
 object RewardedAdManager {
 
     // 실제 서비스용 "몬테카를로 보상형" 광고 단위 ID (Android).
-    private const val REWARDED_AD_UNIT_ID = "ca-app-pub-8544113192886422/8519174296"
+    const val AD_UNIT_MONTE_CARLO = "ca-app-pub-8544113192886422/8519174296"
 
-    private var rewardedAd: RewardedAd? = null
-    private var isLoading = false
+    // 실제 서비스용 "유전알고리즘 보상형" / "기댓값분석 보상형" 광고 단위 ID (2026-08-27 발급).
+    const val AD_UNIT_GENETIC_ALGORITHM = "ca-app-pub-8544113192886422/4118646274"
+    const val AD_UNIT_EXPECTED_VALUE = "ca-app-pub-8544113192886422/2781513879"
+
+    private val loadedAds = mutableMapOf<String, RewardedAd?>()
+    private val loadingFlags = mutableMapOf<String, Boolean>()
 
     /** 화면에 진입하거나 광고를 소진한 직후 미리 다음 광고를 받아둔다 (사용자가 버튼 누를 때 대기 없이 뜨도록). */
-    fun preload(context: Context) {
-        if (rewardedAd != null || isLoading) return
-        isLoading = true
+    fun preload(context: Context, adUnitId: String = AD_UNIT_MONTE_CARLO) {
+        if (loadedAds[adUnitId] != null || loadingFlags[adUnitId] == true) return
+        loadingFlags[adUnitId] = true
 
         RewardedAd.load(
             context,
-            REWARDED_AD_UNIT_ID,
+            adUnitId,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    isLoading = false
+                    loadedAds[adUnitId] = ad
+                    loadingFlags[adUnitId] = false
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    Log.w("RewardedAdManager", "광고 로드 실패: ${error.message}")
-                    rewardedAd = null
-                    isLoading = false
+                    Log.w("RewardedAdManager", "광고 로드 실패($adUnitId): ${error.message}")
+                    loadedAds[adUnitId] = null
+                    loadingFlags[adUnitId] = false
                 }
             }
         )
@@ -55,26 +59,27 @@ object RewardedAdManager {
      */
     fun showAd(
         activity: Activity,
+        adUnitId: String = AD_UNIT_MONTE_CARLO,
         onRewardEarned: () -> Unit,
         onAdUnavailable: () -> Unit
     ) {
-        val ad = rewardedAd
+        val ad = loadedAds[adUnitId]
         if (ad == null) {
             onAdUnavailable()
             // 다음번을 위해 미리 다시 로드해둔다.
-            preload(activity)
+            preload(activity, adUnitId)
             return
         }
 
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
-                rewardedAd = null
-                preload(activity) // 다음 실행을 위해 미리 로드
+                loadedAds[adUnitId] = null
+                preload(activity, adUnitId) // 다음 실행을 위해 미리 로드
             }
 
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                rewardedAd = null
-                preload(activity)
+                loadedAds[adUnitId] = null
+                preload(activity, adUnitId)
                 onAdUnavailable()
             }
         }
