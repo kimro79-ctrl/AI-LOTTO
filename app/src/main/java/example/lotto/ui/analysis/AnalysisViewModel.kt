@@ -609,6 +609,7 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    fun generateSmartNumbers(setCount: Int) {
 
         val generatedSets = mutableListOf<List<Int>>()
         val favorites = _favoriteNumbers.value
