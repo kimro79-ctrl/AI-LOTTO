@@ -126,6 +126,9 @@ fun analyzeLottoSet(numbers: List<Int>): LottoSetAnalysis {
 const val CONDITION_ADVANCED = "고도화 종합 분석 (7대 로직 적용)"
 const val CONDITION_SAKAI = "사카이 분석 (최근 출현 패턴)"
 const val CONDITION_CARRYOVER = "이월수 분석 (최근 3주 당첨번호 반영)"
+const val CONDITION_LAST_DRAW_EXCLUDE = "직전 회차 제외 분석 (참고용)"
+const val CONDITION_GENETIC = "유전 알고리즘 최적화"
+const val CONDITION_EXPECTED_VALUE = "역발상 기댓값 분석"
 const val CONDITION_RANDOM = "완전 무작위 추첨 (일반 자동)"
 const val CONDITION_AC_FILTER = "AC값(번호 복잡도) 기반 필터링"
 const val CONDITION_BALANCE_FILTER = "홀짝 / 고저 균형 필터링"
@@ -455,7 +458,158 @@ class AnalysisViewModel @Inject constructor(
         return diffs.size - (sortedList.size - 1)
     }
 
-    fun generateSmartNumbers(setCount: Int) {
+    /**
+     * 유전 알고리즘 최적화: 랜덤으로 하나씩 뽑아 재시도(generateSmartNumbers)하는 대신,
+     * 후보 조합들을 여러 세대(generation)에 걸쳐 "교차(crossover)"와 "변이(mutation)"로
+     * 진화시켜서 7대 로직 조건에 더 잘 맞는 조합을 효율적으로 찾는다.
+     * ⚠️ 이건 미래를 예측하는 게 아니라, 이미 정해둔 통계적 조건(합계·AC값·구간분포 등)에
+     * 더 가까운 조합을 효율적으로 "탐색"하는 것뿐이다.
+     */
+    fun generateGeneticAlgorithmNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+        val freeSlots = (6 - favorites.size).coerceAtLeast(0)
+
+        fun randomIndividual(): List<Int> {
+            val picked = mutableSetOf<Int>()
+            picked.addAll(favorites)
+            val pool = candidatePool.shuffled().iterator()
+            while (picked.size < 6 && pool.hasNext()) picked.add(pool.next())
+            return picked.toList()
+        }
+
+        // 적합도 함수: 7대 로직 조건을 각각 만족할 때마다 점수를 더한다 (binary 통과/실패가 아니라 연속 점수).
+        fun fitness(individual: List<Int>): Int {
+            val sorted = individual.sorted()
+            var score = 0
+            val oddCount = sorted.count { it % 2 != 0 }
+            if (oddCount in 2..4) score += 15
+            val lowCount = sorted.count { it in 1..22 }
+            if (lowCount in 2..4) score += 15
+            var hasConsecutive = false
+            for (i in 0 until sorted.size - 1) if (sorted[i + 1] - sorted[i] == 1) hasConsecutive = true
+            if (!hasConsecutive) score += 15
+            val endDigits = sorted.map { it % 10 }
+            if (endDigits.groupBy { it }.none { it.value.size >= 3 }) score += 10
+            val sum = sorted.sum()
+            if (sum in 100..175) score += 15
+            val sections = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
+            val distinctSections = sections.count { range -> sorted.any { it in range } }
+            if (distinctSections >= 3) score += 10
+            score += computeAcValue(sorted).coerceIn(0, 10) * 2
+            return score
+        }
+
+        viewModelScope.launch {
+            val populationSize = 60
+            val generations = 40
+            var population = List(populationSize) { randomIndividual() }
+
+            repeat(generations) {
+                // 적합도 순으로 정렬 후 상위 절반만 "부모"로 선택
+                val ranked = population.sortedByDescending { fitness(it) }
+                val parents = ranked.take(populationSize / 2)
+
+                val nextGeneration = mutableListOf<List<Int>>()
+                nextGeneration.addAll(parents.take(4)) // 엘리트 보존: 최상위 몇 개는 그대로 다음 세대로
+
+                while (nextGeneration.size < populationSize) {
+                    val parentA = parents.random()
+                    val parentB = parents.random()
+
+                    // 교차: 두 부모의 번호를 합친 뒤 즐겨찾기를 우선 포함하고 나머지를 랜덤으로 채운다.
+                    val combined = (parentA + parentB).distinct().filter { it !in favorites }.shuffled()
+                    val child = mutableSetOf<Int>()
+                    child.addAll(favorites)
+                    val combinedIterator = combined.iterator()
+                    while (child.size < 6 && combinedIterator.hasNext()) child.add(combinedIterator.next())
+                    val fillIterator = candidatePool.filter { it !in child }.shuffled().iterator()
+                    while (child.size < 6 && fillIterator.hasNext()) child.add(fillIterator.next())
+
+                    // 변이: 15% 확률로 즐겨찾기가 아닌 번호 하나를 후보 풀의 다른 번호로 무작위 교체
+                    var mutated = child.toMutableList()
+                    if (Math.random() < 0.15 && freeSlots > 0) {
+                        val mutableTarget = mutated.filter { it !in favorites }.randomOrNull()
+                        val replacement = candidatePool.filter { it !in mutated }.randomOrNull()
+                        if (mutableTarget != null && replacement != null) {
+                            mutated = mutated.toMutableList().also {
+                                it.remove(mutableTarget)
+                                it.add(replacement)
+                            }
+                        }
+                    }
+                    nextGeneration.add(mutated.take(6))
+                }
+                population = nextGeneration
+            }
+
+            val finalRanked = population.sortedByDescending { fitness(it) }.distinct()
+            val resultSets = finalRanked.take(setCount).map { it.sorted() }
+            _numberSets.value = resultSets
+            _sakaiInfoMessage.value = "${generations}세대 진화 · 7대 로직 적합도 평균 ${finalRanked.take(setCount).map { fitness(it) }.average().toInt()}점 (100점 만점)"
+            _isGenerating.value = false
+        }
+    }
+
+    /**
+     * 역발상 기댓값 분석: 당첨 확률 자체는 어떤 번호를 고르든 동일하지만, 당첨금은 당첨자 수로
+     * 나눠 받는다. 생일패턴(1~31 위주)처럼 사람들이 몰리는 조합을 피하면, 당첨됐을 때
+     * 나눠 받을 확률이 줄어 기대 수령액이 올라간다는 논리에 기반한다.
+     * ⚠️ 당첨 "확률"을 높이는 게 아니라, 당첨됐을 때의 "기대 금액"을 높이려는 회피 전략이다.
+     */
+    fun generateExpectedValueNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+
+        viewModelScope.launch {
+            val generatedSets = mutableListOf<List<Int>>()
+            repeat(setCount) {
+                var resultSet = mutableSetOf<Int>()
+                var attempts = 0
+                var validSet = false
+
+                while (!validSet && attempts < 3000) {
+                    attempts++
+                    resultSet.clear()
+                    resultSet.addAll(favorites)
+                    while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
+                        resultSet.add(candidatePool.random())
+                    }
+                    if (resultSet.size < 6) break
+
+                    val sorted = resultSet.sorted()
+
+                    // 생일패턴(1~31) 회피: 사람들이 흔히 생일로 고르는 1~31 구간이 절반을 넘지 않게 한다.
+                    val birthdayRangeCount = sorted.count { it in 1..31 }
+                    val isBirthdayPatternAvoided = birthdayRangeCount <= 4
+
+                    var hasConsecutive = false
+                    for (i in 0 until sorted.size - 1) if (sorted[i + 1] - sorted[i] == 1) hasConsecutive = true
+
+                    val acValue = computeAcValue(sorted)
+
+                    if (isBirthdayPatternAvoided && !hasConsecutive && acValue >= 5) {
+                        validSet = true
+                    }
+                }
+                generatedSets.add(resultSet.sorted())
+            }
+
+            _numberSets.value = generatedSets
+            _sakaiInfoMessage.value = "생일패턴(1~31 위주) 회피 · 당첨 확률과는 무관하며, 당첨 시 나눠 받을 인원을 줄이기 위한 참고용 전략이에요"
+            _isGenerating.value = false
+        }
+    }
+
+
         val generatedSets = mutableListOf<List<Int>>()
         val favorites = _favoriteNumbers.value
         val excluded = _excludedNumbers.value
