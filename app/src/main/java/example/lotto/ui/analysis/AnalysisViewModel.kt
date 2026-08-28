@@ -161,6 +161,19 @@ class AnalysisViewModel @Inject constructor(
     private val _favoriteNumbers = MutableStateFlow(loadNumberSet("favorite_numbers"))
     val favoriteNumbers: StateFlow<Set<Int>> = _favoriteNumbers.asStateFlow()
 
+    // 연속번호(예: 12,13) 허용 여부 - 기본은 "제외"지만, 사용자 요청으로 직접 켜고 끌 수 있게 했다.
+    // 실제 역대 당첨 데이터를 보면 연속번호가 1쌍 정도 있는 조합도 통계적으로 드물지 않아서,
+    // "무조건 제외"가 오히려 부자연스러울 수 있다는 피드백을 반영했다.
+    private val _allowConsecutiveNumbers = MutableStateFlow(loadAllowConsecutive())
+    val allowConsecutiveNumbers: StateFlow<Boolean> = _allowConsecutiveNumbers.asStateFlow()
+
+    private fun loadAllowConsecutive(): Boolean = prefs.getBoolean("allow_consecutive_numbers", false)
+
+    fun setAllowConsecutiveNumbers(allow: Boolean) {
+        _allowConsecutiveNumbers.value = allow
+        prefs.edit().putBoolean("allow_consecutive_numbers", allow).apply()
+    }
+
     private val _excludedNumbers = MutableStateFlow(loadNumberSet("excluded_numbers"))
     val excludedNumbers: StateFlow<Set<Int>> = _excludedNumbers.asStateFlow()
 
@@ -613,6 +626,7 @@ class AnalysisViewModel @Inject constructor(
         val generatedSets = mutableListOf<List<Int>>()
         val favorites = _favoriteNumbers.value
         val excluded = _excludedNumbers.value
+        val allowConsecutive = _allowConsecutiveNumbers.value
         // 즐겨찾기와 기피 목록을 제외한 나머지 후보 번호 풀
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
 
@@ -649,6 +663,8 @@ class AnalysisViewModel @Inject constructor(
                 val lowCount = sortedList.count { it in 1..22 }
                 val isHighLowValid = lowCount in 2..4
 
+                // ③ 연속번호 제한: 기본은 연속번호(예: 12,13)를 배제하지만, 사용자가 "연속번호 허용"을
+                // 켜두면 이 조건 자체를 건너뛴다(항상 통과 처리).
                 var hasConsecutive = false
                 for (j in 0 until sortedList.size - 1) {
                     if (sortedList[j + 1] - sortedList[j] == 1) {
@@ -656,6 +672,7 @@ class AnalysisViewModel @Inject constructor(
                         break
                     }
                 }
+                val isConsecutiveValid = allowConsecutive || !hasConsecutive
 
                 val endDigits = sortedList.map { it % 10 }
                 val hasTooManySameEndDigits = endDigits.groupBy { it }.any { it.value.size >= 3 }
@@ -677,7 +694,7 @@ class AnalysisViewModel @Inject constructor(
                 // 전체 무작위 구간(1..45)은 항상 통과.
                 val hasAnchorNumber = anchorRange == 1..45 || sortedList.first() in anchorRange
 
-                if (isOddEvenValid && isHighLowValid && !hasConsecutive && !hasTooManySameEndDigits &&
+                if (isOddEvenValid && isHighLowValid && isConsecutiveValid && !hasTooManySameEndDigits &&
                     isSumValid && isSectionValid && isAcValid && hasAnchorNumber) {
                     validSet = true
                 }

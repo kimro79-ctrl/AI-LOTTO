@@ -55,6 +55,7 @@ fun AnalysisScreen(
     val favoriteNumbers by viewModel.favoriteNumbers.collectAsState()
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
     val watchlistNumbers by viewModel.watchlistNumbers.collectAsState()
+    val allowConsecutiveNumbers by viewModel.allowConsecutiveNumbers.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
     var showLogicInfoDialog by remember { mutableStateOf(false) }
@@ -194,6 +195,8 @@ fun AnalysisScreen(
                     onOpenFavoriteExcludeDialog = { showFavoriteExcludeDialog = true },
                     watchlistCount = watchlistNumbers.size,
                     onOpenWatchlistDialog = { showWatchlistDialog = true },
+                    allowConsecutiveNumbers = allowConsecutiveNumbers,
+                    onToggleAllowConsecutive = { viewModel.setAllowConsecutiveNumbers(it) },
                     isGenerating = isGenerating,
                     sakaiInfoMessage = sakaiInfoMessage,
                     currentCondition = selectedCondition
@@ -976,6 +979,8 @@ fun SmartPatternAnalysisSection(
     onOpenFavoriteExcludeDialog: () -> Unit = {},
     watchlistCount: Int = 0,
     onOpenWatchlistDialog: () -> Unit = {},
+    allowConsecutiveNumbers: Boolean = false,
+    onToggleAllowConsecutive: (Boolean) -> Unit = {},
     isGenerating: Boolean = false,
     sakaiInfoMessage: String? = null,
     currentCondition: String = ""
@@ -1135,6 +1140,43 @@ fun SmartPatternAnalysisSection(
                 Text(text = "›", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF15803D))
             }
 
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 연속번호(연번) 포함/제외 토글 - 기본은 제외지만, "왜 무조건 빼냐"는 사용자 피드백을 반영해
+            // 직접 켜고 끌 수 있게 했다. 7대 로직·균형/끝수 필터링 등 연속번호를 검사하는 조건에서 사용된다.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFFFF7ED))
+                    .clickable { onToggleAllowConsecutive(!allowConsecutiveNumbers) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "🔗 연속번호(연번) 포함 허용",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF9A3412)
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = if (allowConsecutiveNumbers) "허용됨 · 12,13처럼 붙은 번호가 나올 수 있어요" else "제외됨 · 탭하면 연속번호도 나올 수 있게 바뀌어요",
+                        fontSize = 11.sp,
+                        color = Color(0xFFC2410C)
+                    )
+                }
+                Switch(
+                    checked = allowConsecutiveNumbers,
+                    onCheckedChange = { onToggleAllowConsecutive(it) },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF97316), checkedTrackColor = Color(0xFFFED7AA))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             Button(
                 onClick = onGenerateClick,
                 enabled = !isGenerating,
@@ -1188,8 +1230,7 @@ fun ConditionChangeBanner(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() },
+            .clip(RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -1197,7 +1238,7 @@ fun ConditionChangeBanner(
             modifier = Modifier
                 .background(
                     Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF0D9488), Color(0xFF10B981))
+                        colors = listOf(Color(0xFFEA580C), Color(0xFFF97316))
                     )
                 )
                 .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -1227,7 +1268,7 @@ fun ConditionChangeBanner(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "적용된 분석 조건 · 탭해서 변경",
+                            text = "적용된 분석 조건",
                             fontSize = 10.sp,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -1243,7 +1284,10 @@ fun ConditionChangeBanner(
                 Surface(
                     color = Color.White,
                     shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 3.dp
+                    shadowElevation = 3.dp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onClick() }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1251,14 +1295,14 @@ fun ConditionChangeBanner(
                     ) {
                         Text(
                             text = "분석조건 변경",
-                            color = Color(0xFF0D9488),
+                            color = Color(0xFFC2410C),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "›",
-                            color = Color(0xFF0D9488),
+                            color = Color(0xFFC2410C),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
