@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -1238,7 +1237,7 @@ fun ConditionChangeBanner(
             modifier = Modifier
                 .background(
                     Brush.horizontalGradient(
-                        colors = listOf(Color(0xFFEA580C), Color(0xFFF97316))
+                        colors = listOf(Color(0xFFE0E7FF), Color(0xFFEDE9FE))
                     )
                 )
                 .padding(horizontal = 16.dp, vertical = 12.dp)
@@ -1248,43 +1247,24 @@ fun ConditionChangeBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "적용된 분석 조건",
-                            fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.85f)
-                        )
-                        Text(
-                            text = currentCondition,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "적용된 분석 조건",
+                        fontSize = 10.sp,
+                        color = Color(0xFF4338CA).copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = currentCondition,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF3730A3)
+                    )
                 }
 
                 Surface(
                     color = Color.White,
                     shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 3.dp,
+                    shadowElevation = 1.dp,
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .clickable { onClick() }
@@ -1295,14 +1275,14 @@ fun ConditionChangeBanner(
                     ) {
                         Text(
                             text = "분석조건 변경",
-                            color = Color(0xFFC2410C),
+                            color = Color(0xFF4338CA),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "›",
-                            color = Color(0xFFC2410C),
+                            color = Color(0xFF4338CA),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
