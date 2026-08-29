@@ -811,6 +811,17 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    /**
+     * "번호 직접 선택하기" 팝업에서 사용자가 손수 고른 조합을 저장할 때 사용한다.
+     * 화면에 마지막으로 선택돼있던 AI 분석 조건과 헷갈리지 않도록, conditionLabel을 고정 문구로 남긴다.
+     */
+    fun saveManualPick(numbers: List<Int>) {
+        viewModelScope.launch {
+            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = "번호 직접 선택")
+            _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
+        }
+    }
+
     fun saveExternalNumbers(sets: List<List<Int>>) {
         if (sets.isNotEmpty()) {
             viewModelScope.launch {

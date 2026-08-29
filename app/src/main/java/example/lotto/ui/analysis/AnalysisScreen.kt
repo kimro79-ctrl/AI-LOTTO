@@ -325,7 +325,7 @@ fun AnalysisScreen(
     if (showManualPickDialog) {
         ManualPickDialog(
             viewModel = viewModel,
-            onSaveClick = { numbers -> viewModel.saveSingleSet(numbers) },
+            onSaveClick = { numbers -> viewModel.saveManualPick(numbers) },
             onDismiss = { showManualPickDialog = false }
         )
     }
