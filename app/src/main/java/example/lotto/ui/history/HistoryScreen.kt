@@ -352,11 +352,15 @@ fun HistoryItem(
     entity: LottoEntity,
     onDeleteClick: () -> Unit
 ) {
-    val typeLabel = when (entity.type) {
-        "ANALYSIS" -> "스마트 분석"
-        "FORTUNE", "TAROT" -> "운세 추천"
-        "QR" -> "QR 스캔"
-        else -> "기타"
+    val typeLabel = if (entity.conditionLabel.isNotBlank()) {
+        entity.conditionLabel
+    } else {
+        when (entity.type) {
+            "ANALYSIS" -> "스마트 분석"
+            "FORTUNE", "TAROT" -> "운세 추천"
+            "QR" -> "QR 스캔"
+            else -> "기타"
+        }
     }
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
