@@ -31,6 +31,9 @@ object AppModule {
             // round 컬럼을 추가하는 마이그레이션. 이걸 등록하지 않으면 버전이 올라갈 때
             // 기존 사용자 데이터가 통째로 삭제되므로 반드시 필요하다.
             .addMigrations(LottoDatabase.MIGRATION_1_2)
+            // conditionLabel 컬럼을 추가하는 마이그레이션. 마찬가지로 등록하지 않으면
+            // 기존 사용자 데이터가 통째로 삭제된다.
+            .addMigrations(LottoDatabase.MIGRATION_2_3)
             .build()
     }
 
