@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [LottoEntity::class], version = 2, exportSchema = false)
+@Database(entities = [LottoEntity::class], version = 3, exportSchema = false)
 abstract class LottoDatabase : RoomDatabase() {
     abstract fun lottoDao(): LottoDao
 
@@ -19,6 +19,18 @@ abstract class LottoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE lotto_history ADD COLUMN round INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        /**
+         * v2 -> v3: 저장 당시 사용자가 실제로 선택했던 분석 조건 문구를 남기기 위해 conditionLabel 컬럼을 추가한다.
+         * 기존 행들은 전부 빈 문자열로 채워지며, 화면에서는 빈 값일 경우 type 기반 기본 라벨로 대체해서 보여준다.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE lotto_history ADD COLUMN conditionLabel TEXT NOT NULL DEFAULT ''"
                 )
             }
         }
