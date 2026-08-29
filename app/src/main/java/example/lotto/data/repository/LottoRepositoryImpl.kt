@@ -17,7 +17,7 @@ class LottoRepositoryImpl @Inject constructor(
         return lottoDao.getAllHistory()
     }
 
-    override suspend fun insertLotto(numbers: List<Int>, type: String, round: Int) {
+    override suspend fun insertLotto(numbers: List<Int>, type: String, round: Int, conditionLabel: String) {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val dateString = dateFormat.format(Date())
         val numbersString = numbers.joinToString(",")
@@ -26,7 +26,8 @@ class LottoRepositoryImpl @Inject constructor(
             numbers = numbersString,
             type = type,
             date = dateString,
-            round = round
+            round = round,
+            conditionLabel = conditionLabel
         )
         lottoDao.insertLotto(entity)
     }
