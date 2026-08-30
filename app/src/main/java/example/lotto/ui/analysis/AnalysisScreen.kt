@@ -30,6 +30,7 @@ import java.net.URL
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -1231,19 +1232,35 @@ fun ConditionChangeBanner(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(
             modifier = Modifier
                 .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFFE0E7FF), Color(0xFFEDE9FE))
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFEEF0FF), // 좌상단: 더 밝게 (광원 느낌)
+                            Color(0xFFE0E7FF),
+                            Color(0xFFD8CFFB)  // 우하단: 살짝 더 진하게
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(1000f, 400f)
                     )
                 )
-                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+            // 상단 가장자리에 얇은 흰색 하이라이트 라인 — "떠 있는 카드" 느낌을 준다.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .align(Alignment.TopCenter)
+                    .background(Color.White.copy(alpha = 0.6f))
+            )
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -1264,7 +1281,7 @@ fun ConditionChangeBanner(
                 Surface(
                     color = Color.White,
                     shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 1.dp,
+                    shadowElevation = 3.dp,
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
                         .clickable { onClick() }
