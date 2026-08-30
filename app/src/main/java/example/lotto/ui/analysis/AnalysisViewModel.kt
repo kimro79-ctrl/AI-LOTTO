@@ -476,6 +476,10 @@ class AnalysisViewModel @Inject constructor(
      * 진화시켜서 7대 로직 조건에 더 잘 맞는 조합을 효율적으로 찾는다.
      * ⚠️ 이건 미래를 예측하는 게 아니라, 이미 정해둔 통계적 조건(합계·AC값·구간분포 등)에
      * 더 가까운 조합을 효율적으로 "탐색"하는 것뿐이다.
+     *
+     * 2026-08-27: 계산 중 예외가 하나라도 나면(예: 즐겨찾기/기피 번호를 너무 많이 설정해 후보 풀이
+     * 바닥나는 경우) _isGenerating이 영영 true로 남아 "광고 보고 나면 안 넘어간다"는 버그로 이어졌던
+     * 문제를 try/catch/finally로 방어했다.
      */
     fun generateGeneticAlgorithmNumbers(setCount: Int) {
         _isGenerating.value = true
@@ -584,6 +588,9 @@ class AnalysisViewModel @Inject constructor(
      * 나눠 받는다. 생일패턴(1~31 위주)처럼 사람들이 몰리는 조합을 피하면, 당첨됐을 때
      * 나눠 받을 확률이 줄어 기대 수령액이 올라간다는 논리에 기반한다.
      * ⚠️ 당첨 "확률"을 높이는 게 아니라, 당첨됐을 때의 "기대 금액"을 높이려는 회피 전략이다.
+     *
+     * 2026-08-27: candidatePool이 비어있을 때 candidatePool.random()이 예외를 던지면서
+     * _isGenerating이 안 풀리던 문제를 try/catch/finally로 방어했다.
      */
     fun generateExpectedValueNumbers(setCount: Int) {
         _isGenerating.value = true
@@ -806,9 +813,10 @@ class AnalysisViewModel @Inject constructor(
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
+            val label = _selectedCondition.value
             viewModelScope.launch {
                 current.forEach { numbers ->
-                    repository.insertLotto(numbers, "ANALYSIS")
+                    repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
                 }
                 _saveMessage.value =
                     "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
@@ -820,8 +828,20 @@ class AnalysisViewModel @Inject constructor(
      * 조합 하나만 골라서 내역에 저장한다. (전체 저장과 별개로, 마음에 드는 조합만 개별 저장할 때 사용)
      */
     fun saveSingleSet(numbers: List<Int>) {
+        val label = _selectedCondition.value
         viewModelScope.launch {
-            repository.insertLotto(numbers, "ANALYSIS")
+            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
+            _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
+        }
+    }
+
+    /**
+     * "번호 직접 선택하기" 팝업에서 사용자가 손수 고른 조합을 저장할 때 사용한다.
+     * 화면에 마지막으로 선택돼있던 AI 분석 조건과 헷갈리지 않도록, conditionLabel을 고정 문구로 남긴다.
+     */
+    fun saveManualPick(numbers: List<Int>) {
+        viewModelScope.launch {
+            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = "번호 직접 선택")
             _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
         }
     }
