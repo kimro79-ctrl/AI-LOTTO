@@ -517,53 +517,65 @@ class AnalysisViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val populationSize = 60
-            val generations = 40
-            var population = List(populationSize) { randomIndividual() }
+            try {
+                val populationSize = 60
+                val generations = 40
+                var population = List(populationSize) { randomIndividual() }
 
-            repeat(generations) {
-                // 적합도 순으로 정렬 후 상위 절반만 "부모"로 선택
-                val ranked = population.sortedByDescending { fitness(it) }
-                val parents = ranked.take(populationSize / 2)
+                repeat(generations) {
+                    // 적합도 순으로 정렬 후 상위 절반만 "부모"로 선택
+                    val ranked = population.sortedByDescending { fitness(it) }
+                    val parents = ranked.take(populationSize / 2).ifEmpty { ranked }
 
-                val nextGeneration = mutableListOf<List<Int>>()
-                nextGeneration.addAll(parents.take(4)) // 엘리트 보존: 최상위 몇 개는 그대로 다음 세대로
+                    val nextGeneration = mutableListOf<List<Int>>()
+                    nextGeneration.addAll(parents.take(4)) // 엘리트 보존: 최상위 몇 개는 그대로 다음 세대로
 
-                while (nextGeneration.size < populationSize) {
-                    val parentA = parents.random()
-                    val parentB = parents.random()
+                    var fillAttempts = 0
+                    while (nextGeneration.size < populationSize && fillAttempts < populationSize * 20) {
+                        fillAttempts++
+                        val parentA = parents.random()
+                        val parentB = parents.random()
 
-                    // 교차: 두 부모의 번호를 합친 뒤 즐겨찾기를 우선 포함하고 나머지를 랜덤으로 채운다.
-                    val combined = (parentA + parentB).distinct().filter { it !in favorites }.shuffled()
-                    val child = mutableSetOf<Int>()
-                    child.addAll(favorites)
-                    val combinedIterator = combined.iterator()
-                    while (child.size < 6 && combinedIterator.hasNext()) child.add(combinedIterator.next())
-                    val fillIterator = candidatePool.filter { it !in child }.shuffled().iterator()
-                    while (child.size < 6 && fillIterator.hasNext()) child.add(fillIterator.next())
+                        // 교차: 두 부모의 번호를 합친 뒤 즐겨찾기를 우선 포함하고 나머지를 랜덤으로 채운다.
+                        val combined = (parentA + parentB).distinct().filter { it !in favorites }.shuffled()
+                        val child = mutableSetOf<Int>()
+                        child.addAll(favorites)
+                        val combinedIterator = combined.iterator()
+                        while (child.size < 6 && combinedIterator.hasNext()) child.add(combinedIterator.next())
+                        val fillIterator = candidatePool.filter { it !in child }.shuffled().iterator()
+                        while (child.size < 6 && fillIterator.hasNext()) child.add(fillIterator.next())
 
-                    // 변이: 15% 확률로 즐겨찾기가 아닌 번호 하나를 후보 풀의 다른 번호로 무작위 교체
-                    var mutated = child.toMutableList()
-                    if (Math.random() < 0.15 && freeSlots > 0) {
-                        val mutableTarget = mutated.filter { it !in favorites }.randomOrNull()
-                        val replacement = candidatePool.filter { it !in mutated }.randomOrNull()
-                        if (mutableTarget != null && replacement != null) {
-                            mutated = mutated.toMutableList().also {
-                                it.remove(mutableTarget)
-                                it.add(replacement)
+                        // 변이: 15% 확률로 즐겨찾기가 아닌 번호 하나를 후보 풀의 다른 번호로 무작위 교체
+                        var mutated = child.toMutableList()
+                        if (Math.random() < 0.15 && freeSlots > 0) {
+                            val mutableTarget = mutated.filter { it !in favorites }.randomOrNull()
+                            val replacement = candidatePool.filter { it !in mutated }.randomOrNull()
+                            if (mutableTarget != null && replacement != null) {
+                                mutated = mutated.toMutableList().also {
+                                    it.remove(mutableTarget)
+                                    it.add(replacement)
+                                }
                             }
                         }
+                        nextGeneration.add(mutated.take(6))
                     }
-                    nextGeneration.add(mutated.take(6))
+                    // 후보 풀이 극단적으로 좁아서 채우지 못한 경우, 이전 세대를 그대로 유지해 무한정 비어있는 걸 방지한다.
+                    population = nextGeneration.ifEmpty { population }
                 }
-                population = nextGeneration
-            }
 
-            val finalRanked = population.sortedByDescending { fitness(it) }.distinct()
-            val resultSets = finalRanked.take(setCount).map { it.sorted() }
-            _numberSets.value = resultSets
-            _sakaiInfoMessage.value = "${generations}세대 진화 · 7대 로직 적합도 평균 ${finalRanked.take(setCount).map { fitness(it) }.average().toInt()}점 (100점 만점)"
-            _isGenerating.value = false
+                val finalRanked = population.sortedByDescending { fitness(it) }.distinct()
+                val resultSets = finalRanked.take(setCount).map { it.sorted() }
+                if (resultSets.isEmpty()) {
+                    _saveMessage.value = "즐겨찾기·기피 번호 설정이 너무 많아 유전 알고리즘을 실행할 수 없어요. 설정을 조금 줄여주세요."
+                } else {
+                    _numberSets.value = resultSets
+                    _sakaiInfoMessage.value = "${generations}세대 진화 · 7대 로직 적합도 평균 ${finalRanked.take(setCount).map { fitness(it) }.average().toInt()}점 (100점 만점)"
+                }
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isGenerating.value = false
+            }
         }
     }
 
@@ -582,42 +594,47 @@ class AnalysisViewModel @Inject constructor(
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
 
         viewModelScope.launch {
-            val generatedSets = mutableListOf<List<Int>>()
-            repeat(setCount) {
-                var resultSet = mutableSetOf<Int>()
-                var attempts = 0
-                var validSet = false
+            try {
+                val generatedSets = mutableListOf<List<Int>>()
+                repeat(setCount) {
+                    var resultSet = mutableSetOf<Int>()
+                    var attempts = 0
+                    var validSet = false
 
-                while (!validSet && attempts < 3000) {
-                    attempts++
-                    resultSet.clear()
-                    resultSet.addAll(favorites)
-                    while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
-                        resultSet.add(candidatePool.random())
+                    while (!validSet && attempts < 3000) {
+                        attempts++
+                        resultSet.clear()
+                        resultSet.addAll(favorites)
+                        while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
+                            resultSet.add(candidatePool.random())
+                        }
+                        if (resultSet.size < 6) break
+
+                        val sorted = resultSet.sorted()
+
+                        // 생일패턴(1~31) 회피: 사람들이 흔히 생일로 고르는 1~31 구간이 절반을 넘지 않게 한다.
+                        val birthdayRangeCount = sorted.count { it in 1..31 }
+                        val isBirthdayPatternAvoided = birthdayRangeCount <= 4
+
+                        var hasConsecutive = false
+                        for (i in 0 until sorted.size - 1) if (sorted[i + 1] - sorted[i] == 1) hasConsecutive = true
+
+                        val acValue = computeAcValue(sorted)
+
+                        if (isBirthdayPatternAvoided && !hasConsecutive && acValue >= 5) {
+                            validSet = true
+                        }
                     }
-                    if (resultSet.size < 6) break
-
-                    val sorted = resultSet.sorted()
-
-                    // 생일패턴(1~31) 회피: 사람들이 흔히 생일로 고르는 1~31 구간이 절반을 넘지 않게 한다.
-                    val birthdayRangeCount = sorted.count { it in 1..31 }
-                    val isBirthdayPatternAvoided = birthdayRangeCount <= 4
-
-                    var hasConsecutive = false
-                    for (i in 0 until sorted.size - 1) if (sorted[i + 1] - sorted[i] == 1) hasConsecutive = true
-
-                    val acValue = computeAcValue(sorted)
-
-                    if (isBirthdayPatternAvoided && !hasConsecutive && acValue >= 5) {
-                        validSet = true
-                    }
+                    generatedSets.add(resultSet.sorted())
                 }
-                generatedSets.add(resultSet.sorted())
-            }
 
-            _numberSets.value = generatedSets
-            _sakaiInfoMessage.value = "생일패턴(1~31 위주) 회피 · 당첨 확률과는 무관하며, 당첨 시 나눠 받을 인원을 줄이기 위한 참고용 전략이에요"
-            _isGenerating.value = false
+                _numberSets.value = generatedSets
+                _sakaiInfoMessage.value = "생일패턴(1~31 위주) 회피 · 당첨 확률과는 무관하며, 당첨 시 나눠 받을 인원을 줄이기 위한 참고용 전략이에요"
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isGenerating.value = false
+            }
         }
     }
 
@@ -789,10 +806,9 @@ class AnalysisViewModel @Inject constructor(
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
-            val label = _selectedCondition.value
             viewModelScope.launch {
                 current.forEach { numbers ->
-                    repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
+                    repository.insertLotto(numbers, "ANALYSIS")
                 }
                 _saveMessage.value =
                     "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
@@ -804,20 +820,8 @@ class AnalysisViewModel @Inject constructor(
      * 조합 하나만 골라서 내역에 저장한다. (전체 저장과 별개로, 마음에 드는 조합만 개별 저장할 때 사용)
      */
     fun saveSingleSet(numbers: List<Int>) {
-        val label = _selectedCondition.value
         viewModelScope.launch {
-            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
-            _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
-        }
-    }
-
-    /**
-     * "번호 직접 선택하기" 팝업에서 사용자가 손수 고른 조합을 저장할 때 사용한다.
-     * 화면에 마지막으로 선택돼있던 AI 분석 조건과 헷갈리지 않도록, conditionLabel을 고정 문구로 남긴다.
-     */
-    fun saveManualPick(numbers: List<Int>) {
-        viewModelScope.launch {
-            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = "번호 직접 선택")
+            repository.insertLotto(numbers, "ANALYSIS")
             _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
         }
     }
