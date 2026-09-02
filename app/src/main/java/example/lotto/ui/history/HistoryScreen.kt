@@ -431,6 +431,8 @@ fun HistoryItem(
     var backtestTotalDraws by remember { mutableStateOf(0) }
     // 어떤 등수 행이 펼쳐져 있는지 (한 번에 하나만 펼치도록 인덱스 하나만 저장)
     var expandedRankIndex by remember { mutableStateOf<Int?>(null) }
+    // 펼친 등수 안에서 "전체 보기"를 눌렀는지 여부. 등수를 바꿔 펼칠 때마다 초기화된다.
+    var showAllInExpandedRank by remember { mutableStateOf(false) }
 
     fun runBacktest() {
         if (numberList.size != 6) return
@@ -621,6 +623,7 @@ fun HistoryItem(
                                             .then(
                                                 if (count > 0) Modifier.clickable {
                                                     expandedRankIndex = if (isExpanded) null else index
+                                                    showAllInExpandedRank = false
                                                 } else Modifier
                                             )
                                             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -653,8 +656,10 @@ fun HistoryItem(
                                             Spacer(modifier = Modifier.height(8.dp))
                                             HorizontalDivider(color = Color(0xFFE2E8F0))
                                             Spacer(modifier = Modifier.height(8.dp))
+                                            val fullList = result.matchedDrawsByRank[index]
+                                            val visibleList = if (showAllInExpandedRank) fullList else fullList.take(5)
                                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                result.matchedDrawsByRank[index].forEach { draw ->
+                                                visibleList.forEach { draw ->
                                                     Row(
                                                         modifier = Modifier.fillMaxWidth(),
                                                         horizontalArrangement = Arrangement.SpaceBetween
@@ -675,6 +680,19 @@ fun HistoryItem(
                                                     }
                                                 }
                                             }
+                                            if (fullList.size > 5) {
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = if (showAllInExpandedRank) "최근 5회만 보기 ▲" else "전체 ${fullList.size}회 보기 ›",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF7C3AED),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable { showAllInExpandedRank = !showAllInExpandedRank }
+                                                        .padding(vertical = 4.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -691,7 +709,7 @@ fun HistoryItem(
 
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "탭하면 실제 해당 회차 목록을 볼 수 있어요",
+                                text = "탭하면 최근 회차부터 볼 수 있어요",
                                 fontSize = 10.sp,
                                 color = Color(0xFFB18CF5)
                             )
