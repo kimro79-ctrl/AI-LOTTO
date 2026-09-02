@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,16 +18,24 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,9 +52,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kimro.ai.lotto.data.local.LottoEntity
+import com.kimro.ai.lotto.ui.analysis.HistoricalDraw
 import com.kimro.ai.lotto.ui.analysis.analyzeLottoSet
+import com.kimro.ai.lotto.ui.analysis.fetchHistoricalDraws
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -84,6 +98,35 @@ private fun formatDateGroupLabel(dateKey: String): String {
         yesterdayKey -> "어제 · $monthDay"
         else -> "${year}년 $monthDay"
     }
+}
+
+// "과거 당첨 이력 보기" 전용 등수 라벨. AnalysisScreen.kt의 BacktestDialog와 같은 등수 체계를 쓰지만,
+// 그쪽 상수(BACKTEST_RANK_LABELS)가 private이라 재사용하지 않고 이 파일 안에 독립적으로 둔다
+// (다른 화면 파일을 건드리지 않기 위한 안전한 선택).
+private val HISTORY_BACKTEST_RANK_LABELS = listOf("1등 (6개 일치)", "2등 (5개+보너스)", "3등 (5개 일치)", "4등 (4개 일치)", "5등 (3개 일치)")
+
+/**
+ * 저장된 번호 조합이, 실제로 존재했던 모든 과거 회차와 비교했을 때 몇 등이 몇 번 나왔는지 계산한다.
+ * index: 0=1등, 1=2등, 2=3등, 3=4등, 4=5등, 5=낙첨.
+ */
+private fun computeHistoryBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>): IntArray {
+    val userMarked = BooleanArray(46)
+    userNumbers.forEach { if (it in 1..45) userMarked[it] = true }
+
+    val rankCounts = IntArray(6)
+    draws.forEach { draw ->
+        val matches = draw.numbers.count { it in 1..45 && userMarked[it] }
+        val bonusMatched = draw.bonusNo in 1..45 && userMarked[draw.bonusNo]
+        when {
+            matches == 6 -> rankCounts[0]++
+            matches == 5 && bonusMatched -> rankCounts[1]++
+            matches == 5 -> rankCounts[2]++
+            matches == 4 -> rankCounts[3]++
+            matches == 3 -> rankCounts[4]++
+            else -> rankCounts[5]++
+        }
+    }
+    return rankCounts
 }
 
 @Composable
@@ -368,6 +411,31 @@ fun HistoryItem(
     // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
     val hasRound = entity.round > 0
 
+    // "과거 당첨 이력 보기" 팝업 상태 - 항목마다 독립적으로 관리한다.
+    var showBacktestDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var isLoadingBacktest by remember { mutableStateOf(false) }
+    var backtestError by remember { mutableStateOf<String?>(null) }
+    var backtestResult by remember { mutableStateOf<IntArray?>(null) }
+    var backtestTotalDraws by remember { mutableStateOf(0) }
+
+    fun runBacktest() {
+        if (numberList.size != 6) return
+        isLoadingBacktest = true
+        backtestError = null
+        coroutineScope.launch {
+            try {
+                val draws = fetchHistoricalDraws()
+                backtestTotalDraws = draws.size
+                backtestResult = computeHistoryBacktest(numberList, draws)
+            } catch (e: Exception) {
+                backtestError = "데이터를 불러오지 못했습니다. 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoadingBacktest = false
+            }
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -426,6 +494,151 @@ fun HistoryItem(
             ) {
                 numberList.forEach { num ->
                     HistoryBallItem(number = num)
+                }
+            }
+
+            if (numberList.size == 6) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = {
+                        showBacktestDialog = true
+                        if (backtestResult == null && !isLoadingBacktest) runBacktest()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = "📜 과거 당첨 이력 보기",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF7C3AED)
+                    )
+                }
+            }
+        }
+    }
+
+    if (showBacktestDialog) {
+        Dialog(onDismissRequest = { showBacktestDialog = false }) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "과거 당첨 이력",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        IconButton(onClick = { showBacktestDialog = false }, modifier = Modifier.size(26.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        numberList.forEach { number -> HistoryBallItem(number = number) }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "이 번호로 1회부터 지금까지 실제로 있었던 모든 회차와 비교하면?",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B),
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    when {
+                        isLoadingBacktest -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("과거 회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                            }
+                        }
+                        backtestError != null -> {
+                            Text(backtestError ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { runBacktest() },
+                                modifier = Modifier.fillMaxWidth().height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                            ) {
+                                Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                        backtestResult != null -> {
+                            val result = backtestResult!!
+                            Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "총 ${"%,d".format(backtestTotalDraws)}개 회차 데이터 기준",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF7C3AED),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                HISTORY_BACKTEST_RANK_LABELS.forEachIndexed { index, label ->
+                                    val count = result[index]
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                                        Text(
+                                            text = if (count > 0) "${count}회" else "0회",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                    Text("${result[5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
+                                        "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있습니다. " +
+                                        "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8),
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
                 }
             }
         }
