@@ -107,26 +107,37 @@ private val HISTORY_BACKTEST_RANK_LABELS = listOf("1등 (6개 일치)", "2등 (5
 
 /**
  * 저장된 번호 조합이, 실제로 존재했던 모든 과거 회차와 비교했을 때 몇 등이 몇 번 나왔는지 계산한다.
- * index: 0=1등, 1=2등, 2=3등, 3=4등, 4=5등, 5=낙첨.
+ * 등수별 횟수뿐 아니라, 실제로 어느 회차였는지도 같이 담아서 사용자가 펼쳐볼 수 있게 한다.
+ * rankCounts index: 0=1등, 1=2등, 2=3등, 3=4등, 4=5등, 5=낙첨.
+ * matchedDrawsByRank index 0~4는 각 등수에 해당하는 실제 회차 목록(최신 회차가 먼저 오도록 정렬).
  */
-private fun computeHistoryBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>): IntArray {
+private data class HistoryBacktestResult(
+    val rankCounts: IntArray,
+    val matchedDrawsByRank: List<List<HistoricalDraw>>
+)
+
+private fun computeHistoryBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>): HistoryBacktestResult {
     val userMarked = BooleanArray(46)
     userNumbers.forEach { if (it in 1..45) userMarked[it] = true }
 
     val rankCounts = IntArray(6)
-    draws.forEach { draw ->
+    val matchedDrawsByRank = List(5) { mutableListOf<HistoricalDraw>() }
+
+    draws.sortedByDescending { it.drawNo }.forEach { draw ->
         val matches = draw.numbers.count { it in 1..45 && userMarked[it] }
         val bonusMatched = draw.bonusNo in 1..45 && userMarked[draw.bonusNo]
-        when {
-            matches == 6 -> rankCounts[0]++
-            matches == 5 && bonusMatched -> rankCounts[1]++
-            matches == 5 -> rankCounts[2]++
-            matches == 4 -> rankCounts[3]++
-            matches == 3 -> rankCounts[4]++
-            else -> rankCounts[5]++
+        val rankIndex = when {
+            matches == 6 -> 0
+            matches == 5 && bonusMatched -> 1
+            matches == 5 -> 2
+            matches == 4 -> 3
+            matches == 3 -> 4
+            else -> 5
         }
+        rankCounts[rankIndex]++
+        if (rankIndex < 5) matchedDrawsByRank[rankIndex].add(draw)
     }
-    return rankCounts
+    return HistoryBacktestResult(rankCounts, matchedDrawsByRank)
 }
 
 @Composable
@@ -416,8 +427,10 @@ fun HistoryItem(
     val coroutineScope = rememberCoroutineScope()
     var isLoadingBacktest by remember { mutableStateOf(false) }
     var backtestError by remember { mutableStateOf<String?>(null) }
-    var backtestResult by remember { mutableStateOf<IntArray?>(null) }
+    var backtestResult by remember { mutableStateOf<HistoryBacktestResult?>(null) }
     var backtestTotalDraws by remember { mutableStateOf(0) }
+    // 어떤 등수 행이 펼쳐져 있는지 (한 번에 하나만 펼치도록 인덱스 하나만 저장)
+    var expandedRankIndex by remember { mutableStateOf<Int?>(null) }
 
     fun runBacktest() {
         if (numberList.size != 6) return
@@ -599,22 +612,70 @@ fun HistoryItem(
 
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 HISTORY_BACKTEST_RANK_LABELS.forEachIndexed { index, label ->
-                                    val count = result[index]
-                                    Row(
+                                    val count = result.rankCounts[index]
+                                    val isExpanded = expandedRankIndex == index
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .then(
+                                                if (count > 0) Modifier.clickable {
+                                                    expandedRankIndex = if (isExpanded) null else index
+                                                } else Modifier
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
                                     ) {
-                                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
-                                        Text(
-                                            text = if (count > 0) "${count}회" else "0회",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = if (count > 0) "${count}회" else "0회",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
+                                                )
+                                                if (count > 0) {
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = if (isExpanded) "▲" else "▼",
+                                                        fontSize = 10.sp,
+                                                        color = Color(0xFF94A3B8)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        if (isExpanded) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            HorizontalDivider(color = Color(0xFFE2E8F0))
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                result.matchedDrawsByRank[index].forEach { draw ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = "${draw.drawNo}회",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Color(0xFF475569)
+                                                        )
+                                                        if (draw.date.isNotBlank()) {
+                                                            Text(
+                                                                text = draw.date,
+                                                                fontSize = 11.sp,
+                                                                color = Color(0xFF94A3B8)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 Row(
@@ -624,11 +685,18 @@ fun HistoryItem(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                    Text("${result[5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                    Text("${result.rankCounts[5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "탭하면 실제 해당 회차 목록을 볼 수 있어요",
+                                fontSize = 10.sp,
+                                color = Color(0xFFB18CF5)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
                                         "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있습니다. " +
