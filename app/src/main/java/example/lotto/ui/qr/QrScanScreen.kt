@@ -318,7 +318,7 @@ fun TaxCalculatorDialog(onDismiss: () -> Unit) {
 
     val amount = amountInput.filter { it.isDigit() }.toLongOrNull() ?: 0L
     val tax = when {
-        amount <= 30_000L -> 0L
+        amount <= 2_000_000L -> 0L
         amount <= 300_000_000L -> (amount * 0.22).toLong()
         else -> (300_000_000L * 0.22).toLong() + ((amount - 300_000_000L) * 0.33).toLong()
     }
@@ -392,7 +392,7 @@ fun TaxCalculatorDialog(onDismiss: () -> Unit) {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = if (amount <= 30_000L) "세금 (비과세)" else "세금 (원천징수)",
+                                text = if (amount <= 2_000_000L) "세금 (비과세)" else "세금 (원천징수)",
                                 fontSize = 13.sp,
                                 color = Color(0xFF64748B)
                             )
@@ -420,7 +420,7 @@ fun TaxCalculatorDialog(onDismiss: () -> Unit) {
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "💡 3만원 이하는 비과세, 3만원 초과~3억원 이하는 22%, 3억원 초과분은 33% 세율이 적용돼요.",
+                        text = "💡 200만원 이하는 비과세, 200만원 초과~3억원 이하는 22%, 3억원 초과분은 33% 세율이 적용돼요.",
                         fontSize = 10.sp,
                         color = Color(0xFF94A3B8),
                         lineHeight = 14.sp
