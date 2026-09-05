@@ -1627,7 +1627,7 @@ fun ManualPickDialog(
                         ) {
                             Text(
                                 text = when {
-                                    freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬레이션 이용권 4회 받기"
+                                    freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬 이용권 4회 받기"
                                     freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
                                     else -> "🎬 광고 보고 시뮬레이션 실행"
                                 },
@@ -2351,7 +2351,7 @@ fun LottoSetCard(
                 ) {
                     Text(
                         text = when {
-                            freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬레이션 이용권 4회 받기"
+                            freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬 이용권 4회 받기"
                             freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
                             else -> "🎬 광고 보고 시뮬레이션 실행"
                         },
