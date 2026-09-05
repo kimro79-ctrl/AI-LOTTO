@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -1621,18 +1622,20 @@ fun ManualPickDialog(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp),
+                                .heightIn(min = 44.dp),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
                                 text = when {
-                                    freeSimUsesToday == 0 -> "🎬 광고 보고 무료 이용권 4회 받기"
+                                    freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬레이션 이용권 4회 받기"
                                     freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
                                     else -> "🎬 광고 보고 시뮬레이션 실행"
                                 },
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF7C3AED)
+                                color = Color(0xFF7C3AED),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
@@ -2343,18 +2346,20 @@ fun LottoSetCard(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp),
+                        .heightIn(min = 42.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         text = when {
-                            freeSimUsesToday == 0 -> "🎬 광고 보고 무료 이용권 4회 받기"
+                            freeSimUsesToday == 0 -> "🎬 광고 보고 몬테카를로 시뮬레이션 이용권 4회 받기"
                             freeSimUsesToday in 1..4 -> "💰 시뮬레이션 실행 (오늘 무료 ${5 - freeSimUsesToday}회 남음)"
                             else -> "🎬 광고 보고 시뮬레이션 실행"
                         },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF7C3AED)
+                        color = Color(0xFF7C3AED),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                     )
                 }
                 Spacer(modifier = Modifier.height(3.dp))
