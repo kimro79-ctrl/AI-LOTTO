@@ -49,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -511,19 +512,31 @@ fun HistoryItem(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = {
-                            shareLottoNumbers(context, buildShareText(typeLabel, numberList, entity.round))
-                        },
-                        modifier = Modifier.size(28.dp)
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF7C3AED))
+                            .clickable {
+                                shareLottoNumbers(context, buildShareText(typeLabel, numberList, entity.round))
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "공유하기",
-                            tint = Color(0xFF7C3AED),
-                            modifier = Modifier.size(18.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "공유",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
+                    Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = onDeleteClick,
                         modifier = Modifier.size(28.dp)
