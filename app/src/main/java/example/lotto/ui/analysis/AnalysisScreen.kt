@@ -1208,7 +1208,7 @@ fun SmartPatternAnalysisSection(
                     )
                     .clip(RoundedCornerShape(16.dp))
                     .background(
-                        if (isGenerating) Color(0xFF93C5FD)
+                        if (isGenerating) Brush.horizontalGradient(listOf(Color(0xFF93C5FD), Color(0xFF93C5FD)))
                         else Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
                     )
                     .clickable(enabled = !isGenerating) { onGenerateClick() },
