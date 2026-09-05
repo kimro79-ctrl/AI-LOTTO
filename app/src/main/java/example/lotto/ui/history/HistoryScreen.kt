@@ -2,6 +2,7 @@
 package com.kimro.ai.lotto.ui.history
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -192,6 +193,7 @@ fun HistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xFFF1F5F9))
             .padding(16.dp)
     ) {
         // 상단 타이틀 및 전체 삭제 버튼 영역
@@ -502,6 +504,21 @@ fun DateGroupHeader(dateKey: String, count: Int, onDeleteGroupClick: () -> Unit)
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // 다른 화면(분석/운세)의 원형 그라데이션 아이콘 배지와 톤을 맞췄다.
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "🗓", fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = formatDateGroupLabel(dateKey),
                 fontWeight = FontWeight.Bold,
@@ -621,12 +638,17 @@ fun HistoryItem(
             .fillMaxWidth()
             .then(
                 if (isSelectionMode) Modifier.clickable { onToggleSelect() } else Modifier
+            )
+            .then(
+                if (isSelectionMode && isSelected) {
+                    Modifier.border(2.dp, Color(0xFF7C3AED), RoundedCornerShape(16.dp))
+                } else {
+                    Modifier
+                }
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelectionMode && isSelected) Color(0xFFDCC9F5) else Color(0xFFF0EAF5)
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(
             modifier = Modifier.padding(12.dp)
