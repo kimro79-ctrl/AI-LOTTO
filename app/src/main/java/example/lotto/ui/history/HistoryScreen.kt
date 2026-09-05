@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -401,11 +403,31 @@ fun DateGroupHeader(dateKey: String, count: Int, onDeleteGroupClick: () -> Unit)
     }
 }
 
+/**
+ * 저장된 조합을 카카오톡/문자 등으로 공유할 때 쓸 텍스트를 만든다.
+ * 표준 공유 시트(Intent.ACTION_SEND)를 그대로 활용하므로, 사용자가 목록에서
+ * 카카오톡·문자·기타 앱 중 원하는 것을 골라 보낼 수 있다.
+ */
+private fun buildShareText(typeLabel: String, numberList: List<Int>, round: Int): String {
+    val numbersText = numberList.sorted().joinToString(", ")
+    val roundText = if (round > 0) " (${round}회차)" else ""
+    return "🎫 AI로또 6/45 - $typeLabel$roundText\n$numbersText"
+}
+
+private fun shareLottoNumbers(context: android.content.Context, shareText: String) {
+    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+    }
+    context.startActivity(android.content.Intent.createChooser(sendIntent, "번호 공유하기"))
+}
+
 @Composable
 fun HistoryItem(
     entity: LottoEntity,
     onDeleteClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val typeLabel = if (entity.conditionLabel.isNotBlank()) {
         entity.conditionLabel
     } else {
@@ -488,16 +510,31 @@ fun HistoryItem(
                         }
                     }
                 }
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "삭제",
-                        tint = Color.LightGray,
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            shareLottoNumbers(context, buildShareText(typeLabel, numberList, entity.round))
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "공유하기",
+                            tint = Color(0xFF7C3AED),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "삭제",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
