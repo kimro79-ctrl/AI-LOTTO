@@ -31,6 +31,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -155,6 +157,12 @@ fun HistoryScreen(
     var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
     var selectedSort by remember { mutableStateOf(HistorySort.LATEST) }
 
+    // 여러 개를 체크박스로 골라서 한 번에 공유하기 위한 "선택 모드" 상태.
+    // 선택 모드를 끄면 선택 내역도 함께 초기화한다.
+    var isSelectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    val context = LocalContext.current
+
     // 필터링 + 정렬된 최종 리스트 계산
     val displayedList = remember(historyList, selectedFilter, selectedSort) {
         val filtered = when (selectedFilter) {
@@ -193,7 +201,7 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "저장된 번호 내역",
+                text = if (isSelectionMode) "${selectedIds.size}개 선택됨" else "저장된 번호 내역",
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
                 style = androidx.compose.ui.text.TextStyle(
@@ -204,22 +212,65 @@ fun HistoryScreen(
                 )
             )
 
-            if (historyList.isNotEmpty()) {
-                IconButton(
-                    onClick = { showClearAllDialog = true },
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "전체 삭제",
-                        tint = Color.Gray
-                    )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isSelectionMode) {
+                    TextButton(onClick = {
+                        isSelectionMode = false
+                        selectedIds = emptySet()
+                    }) {
+                        Text("취소", color = Color(0xFF64748B), fontWeight = FontWeight.Bold)
+                    }
+                } else if (historyList.isNotEmpty()) {
+                    TextButton(onClick = { isSelectionMode = true }) {
+                        Text("선택", color = Color(0xFF7C3AED), fontWeight = FontWeight.Bold)
+                    }
+                    IconButton(
+                        onClick = { showClearAllDialog = true },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "전체 삭제",
+                            tint = Color.Gray
+                        )
+                    }
                 }
             }
         }
 
-        if (historyList.isNotEmpty()) {
-            // 타입별 필터 칩
+        // 선택 모드에서 1개 이상 골랐을 때만 뜨는 "선택한 N개 공유하기" 바.
+        if (isSelectionMode && selectedIds.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF7C3AED))
+                    .clickable {
+                        val selectedEntities = historyList.filter { it.id in selectedIds }
+                        shareLottoNumbers(context, buildMultiShareText(selectedEntities))
+                    }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "선택한 ${selectedIds.size}개 공유하기",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        if (historyList.isNotEmpty() && !isSelectionMode) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -306,7 +357,16 @@ fun HistoryScreen(
                     ) { item ->
                         HistoryItem(
                             entity = item,
-                            onDeleteClick = { viewModel.deleteHistory(item.id) }
+                            onDeleteClick = { viewModel.deleteHistory(item.id) },
+                            isSelectionMode = isSelectionMode,
+                            isSelected = item.id in selectedIds,
+                            onToggleSelect = {
+                                selectedIds = if (item.id in selectedIds) {
+                                    selectedIds - item.id
+                                } else {
+                                    selectedIds + item.id
+                                }
+                            }
                         )
                     }
                     item(key = "spacer_$dateKey") {
@@ -404,6 +464,20 @@ fun DateGroupHeader(dateKey: String, count: Int, onDeleteGroupClick: () -> Unit)
     }
 }
 
+/** 저장된 항목의 표시용 조건 라벨을 구한다. HistoryItem과 묶음 공유 양쪽에서 같이 쓴다. */
+private fun resolveTypeLabel(entity: LottoEntity): String {
+    return if (entity.conditionLabel.isNotBlank()) {
+        entity.conditionLabel
+    } else {
+        when (entity.type) {
+            "ANALYSIS" -> "스마트 분석"
+            "FORTUNE", "TAROT" -> "운세 추천"
+            "QR" -> "QR 스캔"
+            else -> "기타"
+        }
+    }
+}
+
 /**
  * 저장된 조합을 카카오톡/문자 등으로 공유할 때 쓸 텍스트를 만든다.
  * 표준 공유 시트(Intent.ACTION_SEND)를 그대로 활용하므로, 사용자가 목록에서
@@ -413,6 +487,15 @@ private fun buildShareText(typeLabel: String, numberList: List<Int>, round: Int)
     val numbersText = numberList.sorted().joinToString(", ")
     val roundText = if (round > 0) " (${round}회차)" else ""
     return "🎫 AI로또 6/45 - $typeLabel$roundText\n$numbersText"
+}
+
+/** 선택 모드에서 여러 개를 골랐을 때, 각 조합을 구분선으로 나눠 하나의 텍스트로 묶는다. */
+private fun buildMultiShareText(entities: List<LottoEntity>): String {
+    return entities.joinToString(separator = "\n\n") { entity ->
+        val typeLabel = resolveTypeLabel(entity)
+        val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+        buildShareText(typeLabel, numberList, entity.round)
+    }
 }
 
 private fun shareLottoNumbers(context: android.content.Context, shareText: String) {
@@ -426,19 +509,13 @@ private fun shareLottoNumbers(context: android.content.Context, shareText: Strin
 @Composable
 fun HistoryItem(
     entity: LottoEntity,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val typeLabel = if (entity.conditionLabel.isNotBlank()) {
-        entity.conditionLabel
-    } else {
-        when (entity.type) {
-            "ANALYSIS" -> "스마트 분석"
-            "FORTUNE", "TAROT" -> "운세 추천"
-            "QR" -> "QR 스캔"
-            else -> "기타"
-        }
-    }
+    val typeLabel = resolveTypeLabel(entity)
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
 
@@ -475,10 +552,16 @@ fun HistoryItem(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelectionMode) Modifier.clickable { onToggleSelect() } else Modifier
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAF5))
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelectionMode && isSelected) Color(0xFFDCC9F5) else Color(0xFFF0EAF5)
+        )
     ) {
         Column(
             modifier = Modifier.padding(12.dp)
@@ -511,42 +594,51 @@ fun HistoryItem(
                         }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF7C3AED))
-                            .clickable {
-                                shareLottoNumbers(context, buildShareText(typeLabel, numberList, entity.round))
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "공유하기",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "공유",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "삭제",
-                            tint = Color.LightGray,
-                            modifier = Modifier.size(20.dp)
-                        )
+                if (isSelectionMode) {
+                    // 선택 모드에서는 개별 공유/삭제 대신 체크박스만 보여줘서 화면을 단순하게 유지한다.
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF7C3AED))
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF7C3AED))
+                                .clickable {
+                                    shareLottoNumbers(context, buildShareText(typeLabel, numberList, entity.round))
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "공유하기",
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "공유",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "삭제",
+                                tint = Color.LightGray,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -562,7 +654,7 @@ fun HistoryItem(
                 }
             }
 
-            if (numberList.size == 6) {
+            if (numberList.size == 6 && !isSelectionMode) {
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = {
