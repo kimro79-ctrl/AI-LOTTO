@@ -132,6 +132,7 @@ const val CONDITION_RANDOM = "완전 무작위 추첨 (일반 자동)"
 const val CONDITION_AC_FILTER = "AC값(번호 복잡도) 기반 필터링"
 const val CONDITION_BALANCE_FILTER = "홀짝 / 고저 균형 필터링"
 const val CONDITION_END_DIGIT_FILTER = "끝수 및 연속 번호 조합 제한"
+const val CONDITION_COMPANION_NUMBERS = "동반수 분석 (자주 같이 나온 번호)"
 
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
@@ -807,6 +808,83 @@ class AnalysisViewModel @Inject constructor(
             val endDigits = sorted.map { it % 10 }
             val allEndDigitsDistinct = endDigits.toSet().size == endDigits.size
             !hasConsecutive && allEndDigitsDistinct
+        }
+    }
+
+    /**
+     * 동반수 분석: 특정 번호와 역대 회차에서 유독 자주 "같이" 나온 번호(동반수)를 우선 후보로 삼는다.
+     * 즐겨찾기 번호가 있으면 그 번호들을 기준(시드)으로 삼고, 없으면 조합마다 무작위로 기준 번호를
+     * 하나 골라 그 번호의 동반수를 찾는다.
+     * ⚠️ 이건 궁합수(연관규칙) 개념을 쉬운 말로 푼 것으로, 과거 동시출현 빈도를 보여줄 뿐
+     * 로또는 매회 독립 추첨이라 미래 당첨을 예측하거나 확률을 높이는 근거는 없는 참고용 통계다.
+     */
+    fun generateCompanionNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+
+        viewModelScope.launch {
+            try {
+                val allDraws = fetchHistoricalDraws()
+                if (allDraws.isEmpty() || candidatePool.isEmpty()) {
+                    _saveMessage.value = "과거 데이터를 불러오지 못해 동반수 분석을 적용할 수 없습니다."
+                    _isGenerating.value = false
+                    return@launch
+                }
+
+                // 번호쌍 동시출현 횟수 계산: coOccurrence[A][B] = A와 B가 같은 회차에 함께 나온 횟수
+                val coOccurrence = Array(46) { IntArray(46) }
+                allDraws.forEach { draw ->
+                    val nums = draw.numbers.filter { it in 1..45 }
+                    for (a in nums) {
+                        for (b in nums) {
+                            if (a != b) coOccurrence[a][b]++
+                        }
+                    }
+                }
+
+                val generatedSets = mutableListOf<List<Int>>()
+                repeat(setCount) {
+                    val resultSet = mutableSetOf<Int>()
+                    resultSet.addAll(favorites)
+
+                    // 기준(시드) 번호: 즐겨찾기가 있으면 그 번호들, 없으면 이번 조합만을 위한 무작위 기준 번호 1개
+                    val seedNumbers = if (favorites.isNotEmpty()) favorites.toList() else listOf(candidatePool.random())
+
+                    // 기준 번호들과의 동시출현 횟수 합산 점수가 높은 순으로 후보 정렬
+                    val companionScore = candidatePool.associateWith { candidate ->
+                        seedNumbers.sumOf { seed -> coOccurrence[seed][candidate] }
+                    }
+                    val rankedCompanions = candidatePool
+                        .filter { it !in resultSet }
+                        .sortedByDescending { companionScore[it] ?: 0 }
+
+                    // 상위 동반수 12개 안에서 약간의 무작위성을 섞어 매번 똑같은 조합만 나오지 않게 한다.
+                    val topPoolShuffled = rankedCompanions.take(12).shuffled().iterator()
+                    while (resultSet.size < 6 && topPoolShuffled.hasNext()) resultSet.add(topPoolShuffled.next())
+
+                    // 상위 12개로 부족하면 나머지 순위에서 채운다.
+                    val remainingIterator = rankedCompanions.filter { it !in resultSet }.iterator()
+                    while (resultSet.size < 6 && remainingIterator.hasNext()) resultSet.add(remainingIterator.next())
+
+                    generatedSets.add(resultSet.sorted())
+                }
+
+                _numberSets.value = generatedSets
+                val seedLabel = if (favorites.isNotEmpty()) {
+                    "즐겨찾기 번호(${favorites.sorted().joinToString(", ")})"
+                } else {
+                    "각 조합의 기준 번호"
+                }
+                _sakaiInfoMessage.value = "$seedLabel 와 역대 회차에서 자주 함께 나온 동반수 위주로 구성 · 참고용 통계이며 당첨 확률과는 무관해요"
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isGenerating.value = false
+            }
         }
     }
 

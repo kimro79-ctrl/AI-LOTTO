@@ -2,6 +2,7 @@
 package com.kimro.ai.lotto.ui.analysis
 
 import android.widget.Toast
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,8 @@ import java.net.URL
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -168,6 +171,7 @@ fun AnalysisScreen(
                                 CONDITION_AC_FILTER -> viewModel.generateAcFilteredNumbers(selectedSetCount)
                                 CONDITION_BALANCE_FILTER -> viewModel.generateBalancedNumbers(selectedSetCount)
                                 CONDITION_END_DIGIT_FILTER -> viewModel.generateEndDigitFilteredNumbers(selectedSetCount)
+                                CONDITION_COMPANION_NUMBERS -> viewModel.generateCompanionNumbers(selectedSetCount)
                                 CONDITION_GENETIC -> viewModel.generateGeneticAlgorithmNumbers(selectedSetCount)
                                 CONDITION_EXPECTED_VALUE -> viewModel.generateExpectedValueNumbers(selectedSetCount)
                                 else -> viewModel.generateSmartNumbers(selectedSetCount) // CONDITION_ADVANCED(기본값) 등
@@ -1177,36 +1181,62 @@ fun SmartPatternAnalysisSection(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Button(
-                onClick = onGenerateClick,
-                enabled = !isGenerating,
+            // "AI 추천 번호 생성하기" 버튼 - 눌러야 번호가 생성된다는 느낌을 강하게 주기 위해
+            // 그라데이션 + 그림자 + 은은한 펄스(맥박) 애니메이션을 적용했다.
+            // 생성 중일 때는 애니메이션을 멈추고 흐린 색으로 바꿔 "지금은 못 누른다"는 걸 명확히 한다.
+            val infiniteTransition = rememberInfiniteTransition(label = "generateButtonPulse")
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.035f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(46.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0EA5E9),
-                    disabledContainerColor = Color(0xFF93C5FD)
-                )
+                    .height(54.dp)
+                    .scale(if (isGenerating) 1f else pulseScale)
+                    .shadow(
+                        elevation = if (isGenerating) 0.dp else 10.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = Color(0xFF7C3AED),
+                        spotColor = Color(0xFF7C3AED)
+                    )
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isGenerating) Color(0xFF93C5FD)
+                        else Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                    )
+                    .clickable(enabled = !isGenerating) { onGenerateClick() },
+                contentAlignment = Alignment.Center
             ) {
                 if (isGenerating) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "과거 데이터 분석 중...", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "과거 데이터 분석 중...", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 } else {
-                    Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "AI 추천 번호 생성하기",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "👆 여기를 눌러 번호 생성하기",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
                 }
             }
 
             if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER ||
-                        currentCondition == CONDITION_GENETIC || currentCondition == CONDITION_EXPECTED_VALUE) &&
+                        currentCondition == CONDITION_GENETIC || currentCondition == CONDITION_EXPECTED_VALUE ||
+                        currentCondition == CONDITION_COMPANION_NUMBERS) &&
                 !sakaiInfoMessage.isNullOrBlank()) {
                 Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -2170,44 +2200,45 @@ fun LottoSetCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            // 라벨 줄(세트 번호 + 관심번호 포함 뱃지)과 번호 볼 줄을 별도 Row로 분리했다.
+            // 이전에는 한 Row에 SpaceBetween으로 같이 넣어서, 라벨이 길어지면(예: "🔎 관심번호 포함")
+            // 번호 볼들이 밀려나 화면 오른쪽 밖으로 잘려 보이는 문제가 있었다.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${setIndex}세트",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF64748B),
+                    fontSize = 13.sp
+                )
+                if (numbers.any { it in watchlistNumbers }) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "🔎 관심번호 포함",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF16A34A)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${setIndex}세트",
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B),
-                        fontSize = 13.sp
-                    )
-                    if (numbers.any { it in watchlistNumbers }) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "🔎 관심번호 포함",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF16A34A)
-                        )
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    numbers.forEach { number ->
-                        Box {
-                            LottoBall(number = number, size = 32)
-                            if (number in watchlistNumbers) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .size(9.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF16A34A))
-                                )
-                            }
+                numbers.forEach { number ->
+                    Box {
+                        LottoBall(number = number, size = 32)
+                        if (number in watchlistNumbers) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(9.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF16A34A))
+                            )
                         }
                     }
                 }
@@ -3402,6 +3433,7 @@ private fun conditionEmoji(condition: String): String = when (condition) {
     CONDITION_AC_FILTER -> "🧮"
     CONDITION_BALANCE_FILTER -> "⚖️"
     CONDITION_END_DIGIT_FILTER -> "🔢"
+    CONDITION_COMPANION_NUMBERS -> "🤝"
     else -> "✨"
 }
 
@@ -3413,6 +3445,7 @@ private fun conditionSubtitle(condition: String): String = when (condition) {
     CONDITION_AC_FILTER -> "번호 간 차이값 다양성(AC값)이 높은 조합만 선별"
     CONDITION_BALANCE_FILTER -> "홀짝·고저 비율이 한쪽으로 치우치지 않게 조정"
     CONDITION_END_DIGIT_FILTER -> "끝자리 중복과 연속번호를 줄인 조합으로 구성"
+    CONDITION_COMPANION_NUMBERS -> "즐겨찾기 번호와 자주 같이 나온 동반수 위주로 구성 (참고용)"
     else -> ""
 }
 
@@ -3424,6 +3457,7 @@ private fun conditionAccentColor(condition: String): Color = when (condition) {
     CONDITION_AC_FILTER -> Color(0xFF0D9488)
     CONDITION_BALANCE_FILTER -> Color(0xFF0284C7)
     CONDITION_END_DIGIT_FILTER -> Color(0xFFDB2777)
+    CONDITION_COMPANION_NUMBERS -> Color(0xFF0891B2)
     else -> Color(0xFF0284C7)
 }
 
@@ -3441,7 +3475,8 @@ fun ConditionSelectDialog(
         CONDITION_RANDOM,
         CONDITION_AC_FILTER,
         CONDITION_BALANCE_FILTER,
-        CONDITION_END_DIGIT_FILTER
+        CONDITION_END_DIGIT_FILTER,
+        CONDITION_COMPANION_NUMBERS
     )
 
     AlertDialog(
