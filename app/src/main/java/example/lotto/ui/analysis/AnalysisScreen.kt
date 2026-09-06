@@ -3,6 +3,7 @@ package com.kimro.ai.lotto.ui.analysis
 
 import android.widget.Toast
 import androidx.compose.animation.core.*
+import com.google.android.play.core.review.ReviewManagerFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +46,25 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlin.math.roundToLong
 
+/**
+ * 번호 저장 성공 직후처럼 "기분 좋은 타이밍"에 호출한다.
+ * 실제로 팝업을 보여줄지, 얼마나 자주 보여줄지는 구글이 내부적으로 판단/제한하므로
+ * 여기서는 그냥 "지금 요청해도 되는지" 물어보기만 하면 된다. 실패해도 조용히 넘어가고
+ * 절대 사용자 플로우를 막거나 에러를 노출하지 않는다.
+ */
+private fun requestInAppReview(context: android.content.Context) {
+    val activity = context as? android.app.Activity ?: return
+    val manager = ReviewManagerFactory.create(context)
+    val request = manager.requestReviewFlow()
+    request.addOnCompleteListener { task ->
+        if (task.isSuccessful) {
+            val reviewInfo = task.result
+            manager.launchReviewFlow(activity, reviewInfo)
+        }
+        // 실패해도 별도 처리 없음 - 리뷰 요청은 사용자에게 티 나면 안 되는 백그라운드 동작이다.
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalysisScreen(
@@ -82,6 +102,11 @@ fun AnalysisScreen(
     LaunchedEffect(saveMessage) {
         saveMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            // "번호가 저장되었습니다" 계열 메시지일 때만(=저장 성공 시에만) 리뷰를 요청한다.
+            // 실패 메시지(과거 데이터 못 불러옴, 오류 등)에는 절대 안 뜨게 구분.
+            if (msg.contains("저장되었습니다")) {
+                requestInAppReview(context)
+            }
             viewModel.clearSaveMessage()
         }
     }
