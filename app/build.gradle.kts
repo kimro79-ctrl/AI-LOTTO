@@ -104,6 +104,10 @@ dependencies {
     // AdMob (보상형 광고)
     implementation("com.google.android.gms:play-services-ads:23.6.0")
 
+    // In-App Review (앱 내에서 번호 저장 성공 직후 자연스럽게 별점 요청)
+    implementation("com.google.android.play:review:2.0.2")
+    implementation("com.google.android.play:review-ktx:2.0.2")
+
     // CameraX(QR스캔)가 필요로 하는 ListenableFuture의 "진짜" 구현체를 직접, 명시적으로 추가한다.
     // 다른 라이브러리가 간접적으로 끌고 오는 것에 의존하면 컴파일 시점에 못 잡힐 수 있어서 직접 선언한다.
     implementation("com.google.guava:guava:31.1-android")
