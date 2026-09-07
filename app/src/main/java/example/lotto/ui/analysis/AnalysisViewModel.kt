@@ -949,7 +949,7 @@ class AnalysisViewModel @Inject constructor(
                 _numberSets.value = generatedSets
                 val latestDrawNo = allDraws.maxOfOrNull { it.drawNo } ?: 0
                 _sakaiInfoMessage.value =
-                    "${latestDrawNo}회까지 총 ${allDraws.size}개 회차 데이터 기준 · 가장 많이 나온 번호 상위 ${topPool.size}개 활용 · 참고용 통계이며 당첨 확률과는 무관해요"
+                    "최신회차 ${latestDrawNo}회까지 총 ${allDraws.size}개 회차 데이터 기준 · 가장 많이 나온 번호 상위 ${topPool.size}개 활용 · 참고용 통계이며 당첨 확률과는 무관해요"
             } catch (e: Exception) {
                 _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
             } finally {
