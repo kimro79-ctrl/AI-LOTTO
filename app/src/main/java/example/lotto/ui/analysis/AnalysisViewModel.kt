@@ -133,6 +133,7 @@ const val CONDITION_AC_FILTER = "AC값(번호 복잡도) 기반 필터링"
 const val CONDITION_BALANCE_FILTER = "홀짝 / 고저 균형 필터링"
 const val CONDITION_END_DIGIT_FILTER = "끝수 및 연속 번호 조합 제한"
 const val CONDITION_COMPANION_NUMBERS = "동반수 분석 (자주 같이 나온 번호)"
+const val CONDITION_FREQUENCY = "다빈도 번호 분석 (전체 회차 기준)"
 
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
@@ -880,6 +881,75 @@ class AnalysisViewModel @Inject constructor(
                     "각 조합의 기준 번호"
                 }
                 _sakaiInfoMessage.value = "$seedLabel 와 역대 회차에서 자주 함께 나온 동반수 위주로 구성 · 참고용 통계이며 당첨 확률과는 무관해요"
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isGenerating.value = false
+            }
+        }
+    }
+
+    /**
+     * 다빈도 번호 분석: 사카이 분석(최근 26주)과 달리, 지금까지 있었던 "전체 회차" 데이터를 기준으로
+     * 각 번호가 몇 번 나왔는지 전부 세어서, 가장 많이 나온 번호 위주로 조합을 구성한다.
+     * fetchHistoricalDraws()를 호출할 때마다 그 시점의 최신 회차까지 반영되므로, 앱이 계속 최신
+     * 데이터로 업데이트되는 한 이 분석도 자동으로 최신 회차 기준으로 계산된다 (특정 회차를 하드코딩하지 않음).
+     * ⚠️ 사카이/이월수/동반수 분석과 마찬가지로, 과거 출현 빈도가 미래 당첨 확률에 영향을 준다는
+     * 통계적 근거는 없다 - 매 회차는 완전히 독립적인 무작위 추첨이다. 참고용 통계일 뿐이다.
+     */
+    fun generateFrequencyNumbers(setCount: Int) {
+        _isGenerating.value = true
+        _sakaiInfoMessage.value = null
+
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+
+        viewModelScope.launch {
+            try {
+                val allDraws = fetchHistoricalDraws()
+                if (allDraws.isEmpty()) {
+                    _saveMessage.value = "과거 데이터를 불러오지 못해 다빈도 번호 분석을 적용할 수 없습니다."
+                    _isGenerating.value = false
+                    return@launch
+                }
+
+                // 전체 회차 기준 번호별 출현 횟수 계산 (1~45)
+                val counts = IntArray(46)
+                allDraws.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+
+                // 즐겨찾기/기피 번호를 제외한 후보를 출현 빈도 내림차순으로 정렬
+                val rankedByFrequency = (1..45)
+                    .filter { it !in excluded && it !in favorites }
+                    .sortedByDescending { counts[it] }
+
+                // 상위 다빈도 번호 18개 안에서 무작위로 뽑아, 매번 다른 조합이면서도 "다빈도 성향"은 유지
+                val topPool = rankedByFrequency.take(18)
+
+                val generatedSets = mutableListOf<List<Int>>()
+                repeat(setCount) {
+                    val resultSet = mutableSetOf<Int>()
+                    resultSet.addAll(favorites) // 즐겨찾기 번호는 항상 강제 포함
+
+                    val poolIterator = topPool.filter { it !in resultSet }.shuffled().iterator()
+                    while (resultSet.size < 6 && poolIterator.hasNext()) {
+                        resultSet.add(poolIterator.next())
+                    }
+
+                    // 상위 18개만으로 6개를 못 채우는 극단적인 경우(기피 번호 과다 설정 등) 대비 안전장치
+                    if (resultSet.size < 6) {
+                        val remainingIterator = rankedByFrequency.filter { it !in resultSet }.iterator()
+                        while (resultSet.size < 6 && remainingIterator.hasNext()) {
+                            resultSet.add(remainingIterator.next())
+                        }
+                    }
+
+                    generatedSets.add(resultSet.sorted())
+                }
+
+                _numberSets.value = generatedSets
+                val latestDrawNo = allDraws.maxOfOrNull { it.drawNo } ?: 0
+                _sakaiInfoMessage.value =
+                    "${latestDrawNo}회까지 총 ${allDraws.size}개 회차 데이터 기준 · 가장 많이 나온 번호 상위 ${topPool.size}개 활용 · 참고용 통계이며 당첨 확률과는 무관해요"
             } catch (e: Exception) {
                 _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
             } finally {

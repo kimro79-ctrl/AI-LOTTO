@@ -200,6 +200,7 @@ fun AnalysisScreen(
                                 CONDITION_BALANCE_FILTER -> viewModel.generateBalancedNumbers(selectedSetCount)
                                 CONDITION_END_DIGIT_FILTER -> viewModel.generateEndDigitFilteredNumbers(selectedSetCount)
                                 CONDITION_COMPANION_NUMBERS -> viewModel.generateCompanionNumbers(selectedSetCount)
+                                CONDITION_FREQUENCY -> viewModel.generateFrequencyNumbers(selectedSetCount)
                                 CONDITION_GENETIC -> viewModel.generateGeneticAlgorithmNumbers(selectedSetCount)
                                 CONDITION_EXPECTED_VALUE -> viewModel.generateExpectedValueNumbers(selectedSetCount)
                                 else -> viewModel.generateSmartNumbers(selectedSetCount) // CONDITION_ADVANCED(기본값) 등
@@ -1294,7 +1295,7 @@ fun SmartPatternAnalysisSection(
 
             if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER ||
                         currentCondition == CONDITION_GENETIC || currentCondition == CONDITION_EXPECTED_VALUE ||
-                        currentCondition == CONDITION_COMPANION_NUMBERS) &&
+                        currentCondition == CONDITION_COMPANION_NUMBERS || currentCondition == CONDITION_FREQUENCY) &&
                 !sakaiInfoMessage.isNullOrBlank()) {
                 Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -3926,6 +3927,7 @@ private fun conditionEmoji(condition: String): String = when (condition) {
     CONDITION_BALANCE_FILTER -> "⚖️"
     CONDITION_END_DIGIT_FILTER -> "🔢"
     CONDITION_COMPANION_NUMBERS -> "🤝"
+    CONDITION_FREQUENCY -> "📊"
     else -> "✨"
 }
 
@@ -3938,6 +3940,7 @@ private fun conditionSubtitle(condition: String): String = when (condition) {
     CONDITION_BALANCE_FILTER -> "홀짝·고저 비율이 한쪽으로 치우치지 않게 조정"
     CONDITION_END_DIGIT_FILTER -> "끝자리 중복과 연속번호를 줄인 조합으로 구성"
     CONDITION_COMPANION_NUMBERS -> "즐겨찾기 번호와 자주 같이 나온 동반수 위주로 구성 (참고용)"
+    CONDITION_FREQUENCY -> "전체 회차 데이터 기준, 가장 많이 나온 번호 위주로 구성 (참고용)"
     else -> ""
 }
 
@@ -3950,6 +3953,7 @@ private fun conditionAccentColor(condition: String): Color = when (condition) {
     CONDITION_BALANCE_FILTER -> Color(0xFF0284C7)
     CONDITION_END_DIGIT_FILTER -> Color(0xFFDB2777)
     CONDITION_COMPANION_NUMBERS -> Color(0xFF0891B2)
+    CONDITION_FREQUENCY -> Color(0xFFCA8A04)
     else -> Color(0xFF0284C7)
 }
 
@@ -3968,7 +3972,8 @@ fun ConditionSelectDialog(
         CONDITION_AC_FILTER,
         CONDITION_BALANCE_FILTER,
         CONDITION_END_DIGIT_FILTER,
-        CONDITION_COMPANION_NUMBERS
+        CONDITION_COMPANION_NUMBERS,
+        CONDITION_FREQUENCY
     )
 
     AlertDialog(
