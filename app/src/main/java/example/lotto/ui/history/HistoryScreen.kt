@@ -885,23 +885,35 @@ fun HistoryItem(
                                             Spacer(modifier = Modifier.height(8.dp))
                                             val fullList = result.matchedDrawsByRank[index]
                                             val visibleList = if (showAllInExpandedRank) fullList else fullList.take(5)
-                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 visibleList.forEach { draw ->
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween
-                                                    ) {
-                                                        Text(
-                                                            text = "${draw.drawNo}회",
-                                                            fontSize = 11.sp,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = Color(0xFF475569)
-                                                        )
-                                                        if (draw.date.isNotBlank()) {
+                                                    Column {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
                                                             Text(
-                                                                text = draw.date,
+                                                                text = "${draw.drawNo}회",
                                                                 fontSize = 11.sp,
-                                                                color = Color(0xFF94A3B8)
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = Color(0xFF475569)
+                                                            )
+                                                            if (draw.date.isNotBlank()) {
+                                                                Text(
+                                                                    text = draw.date,
+                                                                    fontSize = 11.sp,
+                                                                    color = Color(0xFF94A3B8)
+                                                                )
+                                                            }
+                                                        }
+                                                        // 어떤 번호가 실제로 맞았는지도 같이 보여준다.
+                                                        val matchedNumbers = draw.numbers.filter { it in numberList }.sorted()
+                                                        if (matchedNumbers.isNotEmpty()) {
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Text(
+                                                                text = "일치 번호: ${matchedNumbers.joinToString(", ")}",
+                                                                fontSize = 10.sp,
+                                                                color = Color(0xFF7C3AED)
                                                             )
                                                         }
                                                     }
