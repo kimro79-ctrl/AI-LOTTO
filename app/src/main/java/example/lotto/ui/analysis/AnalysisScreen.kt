@@ -86,6 +86,7 @@ fun AnalysisScreen(
     var showManualPickDialog by remember { mutableStateOf(false) }
     var showFavoriteExcludeDialog by remember { mutableStateOf(false) }
     var showWatchlistDialog by remember { mutableStateOf(false) }
+    var showBatchBacktestDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
 
     // 앱 사용법 안내 팝업 - "오늘 하루 보지 않기"를 체크하지 않으면 앱을 켤 때마다 다시 뜬다.
@@ -325,6 +326,29 @@ fun AnalysisScreen(
                     )
                 }
 
+                item {
+                    OutlinedButton(
+                        onClick = { showBatchBacktestDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                        )
+                    ) {
+                        Text(
+                            text = "📜 전체 조합 백테스트 (${numberSets.size}개 한번에 비교)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontSize = 13.sp,
+                                brush = Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                            )
+                        )
+                    }
+                }
+
                 itemsIndexed(numberSets) { index, set ->
                     LottoSetCard(
                         viewModel = viewModel,
@@ -379,6 +403,13 @@ fun AnalysisScreen(
             onReset = { viewModel.resetWatchlist() },
             weeksSince = { viewModel.watchlistWeeksSince(it) },
             onDismiss = { showWatchlistDialog = false }
+        )
+    }
+
+    if (showBatchBacktestDialog) {
+        BatchBacktestDialog(
+            sets = numberSets,
+            onDismiss = { showBatchBacktestDialog = false }
         )
     }
 
@@ -2755,7 +2786,266 @@ private fun computeBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>)
     return rankCounts
 }
 
+/** 생성된 조합 하나에 대한 백테스트 요약. "이 조합이 과거에 낸 최고 성적이 몇 등이었는지"만 담는다. */
+data class BatchBacktestSummary(
+    val setIndex: Int,
+    val numbers: List<Int>,
+    val bestRank: Int,      // 0 = 3개 이상 맞은 적 없음(낙첨만), 1~5 = 최고 등수
+    val bestRankCount: Int  // 그 최고 등수가 몇 번 나왔는지 (bestRank==0이면 낙첨 횟수)
+)
+
+/** 생성된 조합 여러 개를 한 번에 백테스트해서, 조합마다 최고 성적만 뽑아 요약한다. */
+private fun computeBatchBacktestSummary(sets: List<List<Int>>, draws: List<HistoricalDraw>): List<BatchBacktestSummary> {
+    return sets.mapIndexed { index, numbers ->
+        val rankCounts = computeBacktest(numbers, draws) // [1등,2등,3등,4등,5등,낙첨]
+        val bestRankZeroBased = (0..4).firstOrNull { rankCounts[it] > 0 }
+        if (bestRankZeroBased != null) {
+            BatchBacktestSummary(index + 1, numbers, bestRankZeroBased + 1, rankCounts[bestRankZeroBased])
+        } else {
+            BatchBacktestSummary(index + 1, numbers, 0, rankCounts[5])
+        }
+    }
+}
+
+/**
+ * 생성된 여러 조합(5개/10개)을 한 번에 백테스트해서, 조합별로 "과거 최고 성적"만 간단히 비교해서 보여주는 팝업.
+ * 저장 여부와 무관하게, 지금 화면에 떠 있는 조합 그대로를 대상으로 한다.
+ */
+@Composable
+fun BatchBacktestDialog(
+    sets: List<List<Int>>,
+    onDismiss: () -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var summaries by remember { mutableStateOf<List<BatchBacktestSummary>?>(null) }
+    var totalDraws by remember { mutableStateOf(0) }
+
+    fun run() {
+        isLoading = true
+        errorMessage = null
+        coroutineScope.launch {
+            try {
+                val draws = fetchHistoricalDraws()
+                totalDraws = draws.size
+                summaries = computeBatchBacktestSummary(sets, draws)
+            } catch (e: Exception) {
+                errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { run() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "전체 조합 백테스트",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A)
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "생성된 ${sets.size}개 조합 각각이 과거에 냈던 최고 성적을 비교해봤어요",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("${sets.size}개 조합 분석 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorMessage != null -> {
+                        Text(errorMessage ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { run() },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    summaries != null -> {
+                        Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "총 ${"%,d".format(totalDraws)}개 회차 데이터 기준",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            summaries!!.forEach { summary ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${summary.setIndex}세트",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF334155)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            summary.numbers.sorted().forEach { number ->
+                                                LottoBall(number = number, size = 24)
+                                            }
+                                        }
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        if (summary.bestRank == 0) {
+                                            Text(
+                                                text = "낙첨만",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF94A3B8)
+                                            )
+                                        } else {
+                                            Surface(
+                                                color = backtestRankColor(summary.bestRank).copy(alpha = 0.12f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "최고 ${backtestRankLabel(summary.bestRank)}",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = backtestRankColor(summary.bestRank),
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "${summary.bestRankCount}회",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF94A3B8)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
+                                    "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 3개 이상 맞은 개별 회차 하나를 나타낸다. "언제, 어떤 번호가 맞았는지"를 보여주기 위한 상세 정보. */
+data class BacktestMatchDetail(
+    val drawNo: Int,
+    val date: String,
+    val rank: Int, // 1~5등
+    val matchedNumbers: List<Int>
+)
+
+/** 3개 이상(5등 이상) 맞은 회차만 골라서, 최신 회차 순으로 상세 목록을 만든다. */
+private fun computeBacktestDetails(userNumbers: List<Int>, draws: List<HistoricalDraw>): List<BacktestMatchDetail> {
+    val userMarked = BooleanArray(46)
+    userNumbers.forEach { if (it in 1..45) userMarked[it] = true }
+
+    val details = mutableListOf<BacktestMatchDetail>()
+    draws.forEach { draw ->
+        val matchedNumbers = draw.numbers.filter { it in 1..45 && userMarked[it] }.sorted()
+        val matches = matchedNumbers.size
+        val bonusMatched = draw.bonusNo in 1..45 && userMarked[draw.bonusNo]
+        val rank = when {
+            matches == 6 -> 1
+            matches == 5 && bonusMatched -> 2
+            matches == 5 -> 3
+            matches == 4 -> 4
+            matches == 3 -> 5
+            else -> 0
+        }
+        if (rank in 1..5) {
+            details.add(BacktestMatchDetail(draw.drawNo, draw.date, rank, matchedNumbers))
+        }
+    }
+    return details.sortedByDescending { it.drawNo }
+}
+
+/** 사용자가 고른 6개 번호 각각이, 지난 모든 회차 동안 개별적으로 몇 번씩 나왔는지 센다. */
+private fun computePerNumberHitCounts(userNumbers: List<Int>, draws: List<HistoricalDraw>): Map<Int, Int> {
+    val counts = userNumbers.associateWith { 0 }.toMutableMap()
+    draws.forEach { draw ->
+        draw.numbers.forEach { n ->
+            if (counts.containsKey(n)) counts[n] = counts.getValue(n) + 1
+        }
+    }
+    return counts
+}
+
 private val BACKTEST_RANK_LABELS = listOf("1등 (6개 일치)", "2등 (5개+보너스)", "3등 (5개 일치)", "4등 (4개 일치)", "5등 (3개 일치)")
+
+private fun backtestRankLabel(rank: Int): String = when (rank) {
+    1 -> "1등"
+    2 -> "2등"
+    3 -> "3등"
+    4 -> "4등"
+    else -> "5등"
+}
+
+private fun backtestRankColor(rank: Int): Color = when (rank) {
+    1 -> Color(0xFFF59E0B)
+    2 -> Color(0xFF7C3AED)
+    3 -> Color(0xFF7C3AED)
+    4 -> Color(0xFF0EA5E9)
+    else -> Color(0xFF10B981)
+}
 
 /**
  * "이 번호로 과거에 실제로 있었던 모든 회차에 응모했다면 어떤 결과였을까?"를 보여주는 백테스트 팝업.
@@ -2771,6 +3061,9 @@ fun BacktestDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var historicalDraws by remember { mutableStateOf<List<HistoricalDraw>?>(null) }
     var backtestResult by remember { mutableStateOf<IntArray?>(null) }
+    var matchDetails by remember { mutableStateOf<List<BacktestMatchDetail>?>(null) }
+    var perNumberCounts by remember { mutableStateOf<Map<Int, Int>?>(null) }
+    var showMatchDetails by remember { mutableStateOf(false) }
 
     fun runBacktest() {
         isLoading = true
@@ -2779,6 +3072,8 @@ fun BacktestDialog(
             try {
                 val draws = historicalDraws ?: fetchHistoricalDraws().also { historicalDraws = it }
                 backtestResult = computeBacktest(numbers, draws)
+                matchDetails = computeBacktestDetails(numbers, draws)
+                perNumberCounts = computePerNumberHitCounts(numbers, draws)
             } catch (e: Exception) {
                 errorMessage = "데이터를 불러오지 못했습니다 (${e.javaClass.simpleName}). 네트워크 상태를 확인 후 다시 시도해주세요."
             } finally {
@@ -2898,6 +3193,131 @@ fun BacktestDialog(
                             ) {
                                 Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
                                 Text("${backtestResult!![5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+
+                        // 번호별 적중 횟수 - 고른 6개 번호 각각이 지난 회차 동안 개별적으로 몇 번 나왔는지
+                        Spacer(modifier = Modifier.height(18.dp))
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "번호별 적중 횟수",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "각 번호가 지난 회차 동안 개별적으로 몇 번 나왔는지예요 (6개가 동시에 맞은 것과는 별개예요)",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        perNumberCounts?.let { counts ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                numbers.sorted().forEach { number ->
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        LottoBall(number = number, size = 32)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "${counts[number] ?: 0}회",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 회차별 상세 보기 - "언제, 어떤 번호가 맞았는지" 실제 회차 목록
+                        Spacer(modifier = Modifier.height(18.dp))
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { showMatchDetails = !showMatchDetails }
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "회차별 상세 보기 (${matchDetails?.size ?: 0}건)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                            Icon(
+                                imageVector = if (showMatchDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Color(0xFF7C3AED)
+                            )
+                        }
+
+                        if (showMatchDetails) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (matchDetails.isNullOrEmpty()) {
+                                Text(
+                                    text = "3개 이상 맞은 회차가 없어요.",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    matchDetails!!.forEach { detail ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "${detail.drawNo}회",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF334155)
+                                                    )
+                                                    if (detail.date.isNotBlank()) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = detail.date,
+                                                            fontSize = 11.sp,
+                                                            color = Color(0xFF94A3B8)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(3.dp))
+                                                Text(
+                                                    text = "일치 번호: ${detail.matchedNumbers.joinToString(", ")}",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFF64748B)
+                                                )
+                                            }
+                                            Surface(
+                                                color = backtestRankColor(detail.rank).copy(alpha = 0.12f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = backtestRankLabel(detail.rank),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = backtestRankColor(detail.rank),
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
