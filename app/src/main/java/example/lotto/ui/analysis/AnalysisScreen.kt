@@ -32,6 +32,7 @@ import java.net.URL
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -2790,18 +2791,24 @@ private fun computeBacktest(userNumbers: List<Int>, draws: List<HistoricalDraw>)
 data class BatchBacktestSummary(
     val setIndex: Int,
     val numbers: List<Int>,
-    val bestRank: Int,      // 0 = 3개 이상 맞은 적 없음(낙첨만), 1~5 = 최고 등수
-    val bestRankCount: Int  // 그 최고 등수가 몇 번 나왔는지 (bestRank==0이면 낙첨 횟수)
+    val bestRank: Int,             // 0 = 3개 이상 맞은 적 없음(낙첨만), 1~5 = 최고 등수
+    val bestRankCount: Int,        // 그 최고 등수가 몇 번 나왔는지 (bestRank==0이면 낙첨 횟수)
+    val bestMatchedNumbers: List<Int> = emptyList(), // 최고 등수를 냈던 회차에서 실제로 맞았던 번호들
+    val bestDrawNo: Int = 0,       // 최고 등수를 냈던 가장 최근 회차 번호 (0이면 해당 없음)
+    val bestDrawDate: String = ""  // 그 회차의 날짜
 )
 
-/** 생성된 조합 여러 개를 한 번에 백테스트해서, 조합마다 최고 성적만 뽑아 요약한다. */
+/** 생성된 조합 여러 개를 한 번에 백테스트해서, 조합마다 최고 성적 + 그때(가장 최근 회차) 맞았던 번호까지 뽑아 요약한다. */
 private fun computeBatchBacktestSummary(sets: List<List<Int>>, draws: List<HistoricalDraw>): List<BatchBacktestSummary> {
     return sets.mapIndexed { index, numbers ->
-        val rankCounts = computeBacktest(numbers, draws) // [1등,2등,3등,4등,5등,낙첨]
-        val bestRankZeroBased = (0..4).firstOrNull { rankCounts[it] > 0 }
-        if (bestRankZeroBased != null) {
-            BatchBacktestSummary(index + 1, numbers, bestRankZeroBased + 1, rankCounts[bestRankZeroBased])
+        val details = computeBacktestDetails(numbers, draws) // 최신 회차 순, 3개 이상 맞은 것만
+        if (details.isNotEmpty()) {
+            val bestRank = details.minOf { it.rank }
+            val bestMatch = details.first { it.rank == bestRank } // 정렬상 최신 회차가 먼저 옴
+            val bestCount = details.count { it.rank == bestRank }
+            BatchBacktestSummary(index + 1, numbers, bestRank, bestCount, bestMatch.matchedNumbers, bestMatch.drawNo, bestMatch.date)
         } else {
+            val rankCounts = computeBacktest(numbers, draws)
             BatchBacktestSummary(index + 1, numbers, 0, rankCounts[5])
         }
     }
@@ -2821,6 +2828,9 @@ fun BatchBacktestDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var summaries by remember { mutableStateOf<List<BatchBacktestSummary>?>(null) }
     var totalDraws by remember { mutableStateOf(0) }
+    // 요약 목록에서 한 조합을 탭하면 그 조합의 상세 백테스트(회차별 매치 목록 포함)를 위에 띄운다.
+    // 닫으면 다시 이 요약 목록으로 돌아온다.
+    var selectedSetForDetail by remember { mutableStateOf<List<Int>?>(null) }
 
     fun run() {
         isLoading = true
@@ -2918,7 +2928,9 @@ fun BatchBacktestDialog(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFF8FAFC))
+                                        .clickable { selectedSetForDetail = summary.numbers }
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -2933,8 +2945,24 @@ fun BatchBacktestDialog(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             summary.numbers.sorted().forEach { number ->
-                                                LottoBall(number = number, size = 24)
+                                                val isMatched = number in summary.bestMatchedNumbers
+                                                Box(
+                                                    modifier = Modifier.alpha(
+                                                        if (summary.bestMatchedNumbers.isEmpty() || isMatched) 1f else 0.3f
+                                                    )
+                                                ) {
+                                                    LottoBall(number = number, size = 24)
+                                                }
                                             }
+                                        }
+                                        if (summary.bestMatchedNumbers.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "${summary.bestDrawNo}회 일치: ${summary.bestMatchedNumbers.joinToString(", ")}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = backtestRankColor(summary.bestRank)
+                                            )
                                         }
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
@@ -2966,6 +2994,13 @@ fun BatchBacktestDialog(
                                             )
                                         }
                                     }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "›",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFCBD5E1)
+                                    )
                                 }
                             }
                         }
@@ -2982,6 +3017,13 @@ fun BatchBacktestDialog(
                 }
             }
         }
+    }
+
+    selectedSetForDetail?.let { detailNumbers ->
+        BacktestDialog(
+            numbers = detailNumbers,
+            onDismiss = { selectedSetForDetail = null }
+        )
     }
 }
 
