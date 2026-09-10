@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "677064996555",
+    "project_id": "ai-lotto-2a322",
+    "storage_bucket": "ai-lotto-2a322.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:677064996555:android:3238d9af0c77552e7ccd4e",
+        "android_client_info": {
+          "package_name": "com.kimro.ai.lotto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdMXiE56ffzW_7xNBOxCsKysyXlXE38zw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
