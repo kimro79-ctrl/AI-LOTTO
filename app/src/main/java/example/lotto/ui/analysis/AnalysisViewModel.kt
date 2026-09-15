@@ -164,6 +164,11 @@ class AnalysisViewModel @Inject constructor(
     private val _randomPickedCondition = MutableStateFlow<String?>(null)
     val randomPickedCondition: StateFlow<String?> = _randomPickedCondition.asStateFlow()
 
+    // "전체 분석 조건 랜덤"으로 생성했을 때, 조합마다 실제로 어떤 조건이 쓰였는지 순서대로 담는다.
+    // numberSets와 인덱스가 1:1로 대응한다 (0번째 조합 = randomMixLabels[0]에 쓰인 조건).
+    private val _randomMixLabels = MutableStateFlow<List<String>?>(null)
+    val randomMixLabels: StateFlow<List<String>?> = _randomMixLabels.asStateFlow()
+
     // 즐겨찾는 번호(항상 포함) / 기피 번호(항상 제외) 설정을 앱을 껐다 켜도 유지하기 위해 SharedPreferences에 저장한다.
     private val prefs = application.getSharedPreferences("lotto_number_prefs", Context.MODE_PRIVATE)
 
@@ -336,6 +341,7 @@ class AnalysisViewModel @Inject constructor(
         _selectedCondition.value = condition
         if (condition != CONDITION_RANDOM_PICK) {
             _randomPickedCondition.value = null
+            _randomMixLabels.value = null
         }
     }
 
@@ -983,11 +989,191 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    // ── 아래 generateOneXxxSet 함수들은 각 조건의 "조합 N개 만들기" 로직에서, repeat(setCount) 루프
+    // 안쪽 1회분만 그대로 떼어낸 것이다. "전체 분석 조건 랜덤"에서 조합 하나하나마다 다른 조건을
+    // 섞어 쓰려면 조건별로 "조합 1개만 만드는" 버전이 필요해서 추가했다.
+    // 원래 함수(generateSakaiNumbers 등)의 로직과 100% 동일하게 유지했고, 원래 함수들은 그대로 둬서 단독 실행 시 동작은 안 바뀐다.
+
+    /** generateWithValidator의 1회분 - "완전 무작위/AC값/홀짝고저/끝수연속" 4개 조건이 공유한다. */
+    private fun generateOneWithValidator(
+        favorites: List<Int>,
+        excluded: List<Int>,
+        validator: ((List<Int>) -> Boolean)?
+    ): List<Int> {
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+        var resultSet = mutableSetOf<Int>()
+        var validSet = false
+        var attempts = 0
+        while (!validSet && attempts < 500) {
+            attempts++
+            resultSet = mutableSetOf()
+            resultSet.addAll(favorites)
+            while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
+                resultSet.add(candidatePool.random())
+            }
+            if (resultSet.size < 6) break
+            validSet = validator?.invoke(resultSet.sorted()) ?: true
+        }
+        return resultSet.sorted()
+    }
+
+    /** generateSmartNumbers(고도화 종합 분석, 7대 로직)의 1회분. 앵커 구간은 매번 무작위로 하나 고른다. */
+    private fun generateOneSmartSet(favorites: List<Int>, excluded: List<Int>, allowConsecutive: Boolean): List<Int> {
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+        val anchorRange = listOf(1..15, 1..15, 10..30, 10..30, 1..45).random()
+        var resultSet = mutableSetOf<Int>()
+        var validSet = false
+        var attempts = 0
+        while (!validSet && attempts < 8000) {
+            attempts++
+            resultSet = mutableSetOf()
+            resultSet.addAll(favorites)
+            while (resultSet.size < 6 && candidatePool.isNotEmpty()) {
+                resultSet.add(candidatePool.random())
+            }
+            if (resultSet.size < 6) break
+
+            val sortedList = resultSet.sorted()
+            val oddCount = sortedList.count { it % 2 != 0 }
+            val isOddEvenValid = oddCount in 2..4
+            val lowCount = sortedList.count { it in 1..22 }
+            val isHighLowValid = lowCount in 2..4
+            var hasConsecutive = false
+            for (j in 0 until sortedList.size - 1) {
+                if (sortedList[j + 1] - sortedList[j] == 1) { hasConsecutive = true; break }
+            }
+            val isConsecutiveValid = allowConsecutive || !hasConsecutive
+            val endDigits = sortedList.map { it % 10 }
+            val hasTooManySameEndDigits = endDigits.groupBy { it }.any { it.value.size >= 3 }
+            val sum = sortedList.sum()
+            val isSumValid = sum in 100..175
+            val sections = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
+            val distinctSectionCount = sections.count { range -> sortedList.any { it in range } }
+            val isSectionValid = distinctSectionCount >= 3
+            val acValue = computeAcValue(sortedList)
+            val isAcValid = acValue >= 5
+            val hasAnchorNumber = anchorRange == 1..45 || sortedList.first() in anchorRange
+
+            if (isOddEvenValid && isHighLowValid && isConsecutiveValid && !hasTooManySameEndDigits &&
+                isSumValid && isSectionValid && isAcValid && hasAnchorNumber) {
+                validSet = true
+            }
+        }
+        return resultSet.sorted()
+    }
+
+    /** generateSakaiNumbers의 1회분. */
+    private fun generateOneSakaiSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+        val recentWeeks = allDraws.sortedByDescending { it.drawNo }.take(26)
+        if (recentWeeks.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
+
+        val counts = IntArray(46)
+        recentWeeks.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+        val avg = recentWeeks.size * 6 / 45.0
+        val lowerBound = (avg - 1).toInt().coerceAtLeast(0)
+        val upperBound = (avg + 1).toInt()
+        var candidatePool = (1..45).filter { counts[it] in lowerBound..upperBound }
+        if (candidatePool.size < 10) candidatePool = (1..45).toList()
+        candidatePool = candidatePool.filter { it !in excluded }
+        val lastDrawNumbers = recentWeeks.maxByOrNull { it.drawNo }?.numbers?.filter { it !in excluded } ?: emptyList()
+
+        val resultSet = mutableSetOf<Int>()
+        resultSet.addAll(favorites)
+        if (lastDrawNumbers.isNotEmpty() && Random.nextBoolean()) {
+            resultSet.add(lastDrawNumbers.random())
+        }
+        val pool = candidatePool.filter { it !in resultSet }.ifEmpty {
+            (1..45).filter { n -> n !in resultSet && n !in excluded }
+        }
+        val poolIterator = pool.shuffled().iterator()
+        while (resultSet.size < 6 && poolIterator.hasNext()) {
+            resultSet.add(poolIterator.next())
+        }
+        var fallbackAttempts = 0
+        while (resultSet.size < 6 && fallbackAttempts < 200) {
+            val candidate = (1..45).random()
+            if (candidate !in excluded) resultSet.add(candidate)
+            fallbackAttempts++
+        }
+        return resultSet.sorted()
+    }
+
+    /** generateCarryoverNumbers의 1회분. */
+    private fun generateOneCarryoverSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+        val recentDraws = allDraws.sortedByDescending { it.drawNo }.take(3)
+        if (recentDraws.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
+
+        val carryoverPool = recentDraws.flatMap { it.numbers }.distinct().filter { it !in excluded }
+        val fullPool = (1..45).filter { it !in excluded }
+        val resultSet = mutableSetOf<Int>()
+        resultSet.addAll(favorites)
+        if (carryoverPool.isNotEmpty() && resultSet.size < 6) {
+            val carryoverCount = (1..2).random().coerceAtMost(6 - resultSet.size)
+            resultSet.addAll(carryoverPool.shuffled().take(carryoverCount))
+        }
+        val poolIterator = fullPool.filter { it !in resultSet }.shuffled().iterator()
+        while (resultSet.size < 6 && poolIterator.hasNext()) {
+            resultSet.add(poolIterator.next())
+        }
+        return resultSet.sorted()
+    }
+
+    /** generateCompanionNumbers의 1회분. */
+    private fun generateOneCompanionSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+        val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
+        if (allDraws.isEmpty() || candidatePool.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
+
+        val coOccurrence = Array(46) { IntArray(46) }
+        allDraws.forEach { draw ->
+            val nums = draw.numbers.filter { it in 1..45 }
+            for (a in nums) for (b in nums) if (a != b) coOccurrence[a][b]++
+        }
+        val resultSet = mutableSetOf<Int>()
+        resultSet.addAll(favorites)
+        val seedNumbers = if (favorites.isNotEmpty()) favorites.toList() else listOf(candidatePool.random())
+        val companionScore = candidatePool.associateWith { candidate -> seedNumbers.sumOf { seed -> coOccurrence[seed][candidate] } }
+        val rankedCompanions = candidatePool.filter { it !in resultSet }.sortedByDescending { companionScore[it] ?: 0 }
+        val topPoolShuffled = rankedCompanions.take(12).shuffled().iterator()
+        while (resultSet.size < 6 && topPoolShuffled.hasNext()) resultSet.add(topPoolShuffled.next())
+        val remainingIterator = rankedCompanions.filter { it !in resultSet }.iterator()
+        while (resultSet.size < 6 && remainingIterator.hasNext()) resultSet.add(remainingIterator.next())
+        return resultSet.sorted()
+    }
+
+    /** generateFrequencyNumbers의 1회분. */
+    private fun generateOneFrequencySet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+        if (allDraws.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
+
+        val counts = IntArray(46)
+        allDraws.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+        val rankedByFrequency = (1..45).filter { it !in excluded && it !in favorites }.sortedByDescending { counts[it] }
+        val topPool = rankedByFrequency.take(18)
+
+        val resultSet = mutableSetOf<Int>()
+        resultSet.addAll(favorites)
+        val poolIterator = topPool.filter { it !in resultSet }.shuffled().iterator()
+        while (resultSet.size < 6 && poolIterator.hasNext()) {
+            resultSet.add(poolIterator.next())
+        }
+        if (resultSet.size < 6) {
+            val remainingIterator = rankedByFrequency.filter { it !in resultSet }.iterator()
+            while (resultSet.size < 6 && remainingIterator.hasNext()) {
+                resultSet.add(remainingIterator.next())
+            }
+        }
+        return resultSet.sorted()
+    }
+
+    /** 조건명을 짧게 줄인다. 예: "사카이 분석 (최근 출현 패턴)" -> "사카이 분석". 카드 배지 표시용. */
+    private fun shortConditionLabel(condition: String): String = condition.substringBefore("(").trim()
+
     /**
-     * "전체 분석 조건 랜덤": 어떤 조건을 골라야 할지 모르겠는 사용자를 위해, 무료(광고 없는)
-     * 기본 분석 조건 중 하나를 무작위로 뽑아서 대신 실행해준다.
-     * ⚠️ 유전 알고리즘·역발상 기댓값(AI 고급 분석)은 광고 시청이 필요한 조건이라 이 풀에서 제외했다.
-     * "가볍게 아무거나 뽑아보는" 기능에서 갑자기 광고가 뜨면 사용자 입장에서 당황스러울 수 있어서다.
+     * "전체 분석 조건 랜덤": 조합 N개를 만들 때, N개 전부를 같은 조건 하나로 만드는 게 아니라
+     * 조합 하나하나마다 다른 조건을 섞어서 쓴다. 예를 들어 5개를 생성하면 1번은 사카이, 2번은
+     * AC값 필터링, 3번은 다빈도... 이런 식으로 매번 다른 로직이 섞여서 한 번에 나온다.
+     * 셔플백(shuffle bag) 방식으로 뽑아서, 9번 뽑을 때마다 9개 조건이 골고루 한 번씩은 나오게 한다.
+     * ⚠️ 유전 알고리즘·역발상 기댓값(광고 필요)은 이 풀에서 제외했다 - "가볍게 섞어보는" 기능에서
+     * 갑자기 광고가 뜨면 당황스러울 수 있어서다.
      */
     private val randomPickPool = listOf(
         CONDITION_ADVANCED,
@@ -1000,31 +1186,87 @@ class AnalysisViewModel @Inject constructor(
         CONDITION_COMPANION_NUMBERS,
         CONDITION_FREQUENCY
     )
+    private var randomPickBag: MutableList<String> = mutableListOf()
 
     fun generateRandomConditionNumbers(setCount: Int) {
+        _isGenerating.value = true
         _sakaiInfoMessage.value = null
-        val picked = randomPickPool.random()
-        _randomPickedCondition.value = picked
 
-        when (picked) {
-            CONDITION_ADVANCED -> generateSmartNumbers(setCount)
-            CONDITION_SAKAI -> generateSakaiNumbers(setCount)
-            CONDITION_CARRYOVER -> generateCarryoverNumbers(setCount)
-            CONDITION_RANDOM -> generateRandomNumbers(setCount)
-            CONDITION_AC_FILTER -> generateAcFilteredNumbers(setCount)
-            CONDITION_BALANCE_FILTER -> generateBalancedNumbers(setCount)
-            CONDITION_END_DIGIT_FILTER -> generateEndDigitFilteredNumbers(setCount)
-            CONDITION_COMPANION_NUMBERS -> generateCompanionNumbers(setCount)
-            CONDITION_FREQUENCY -> generateFrequencyNumbers(setCount)
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        val allowConsecutive = _allowConsecutiveNumbers.value
+
+        viewModelScope.launch {
+            try {
+                // 조합 N개 각각에 쓸 조건을 셔플백에서 미리 N개 뽑아둔다.
+                val pickedConditions = mutableListOf<String>()
+                repeat(setCount) {
+                    if (randomPickBag.isEmpty()) {
+                        randomPickBag = randomPickPool.shuffled().toMutableList()
+                    }
+                    pickedConditions.add(randomPickBag.removeAt(0))
+                }
+
+                // 과거 회차 데이터가 필요한 조건(사카이/이월수/동반수/다빈도)이 하나라도 섞여 있으면
+                // 한 번만 불러와서 재사용한다 (fetchHistoricalDraws 내부에 캐시가 있어 중복 호출도 안전하지만,
+                // 굳이 여러 번 부를 필요 없이 한 번만 받아서 넘긴다).
+                val needsHistoricalData = pickedConditions.any {
+                    it == CONDITION_SAKAI || it == CONDITION_CARRYOVER ||
+                            it == CONDITION_COMPANION_NUMBERS || it == CONDITION_FREQUENCY
+                }
+                val allDraws: List<HistoricalDraw> = if (needsHistoricalData) fetchHistoricalDraws() else emptyList()
+
+                val generatedSets = pickedConditions.map { condition ->
+                    when (condition) {
+                        CONDITION_ADVANCED -> generateOneSmartSet(favorites, excluded, allowConsecutive)
+                        CONDITION_SAKAI -> generateOneSakaiSet(favorites, excluded, allDraws)
+                        CONDITION_CARRYOVER -> generateOneCarryoverSet(favorites, excluded, allDraws)
+                        CONDITION_RANDOM -> generateOneWithValidator(favorites, excluded, null)
+                        CONDITION_AC_FILTER -> generateOneWithValidator(favorites, excluded) { sorted ->
+                            val pairwiseDiffs = mutableSetOf<Int>()
+                            for (i in sorted.indices) for (j in i + 1 until sorted.size) pairwiseDiffs.add(sorted[j] - sorted[i])
+                            (pairwiseDiffs.size - 5).coerceIn(0, 10) >= 7
+                        }
+                        CONDITION_BALANCE_FILTER -> generateOneWithValidator(favorites, excluded) { sorted ->
+                            sorted.count { it % 2 != 0 } == 3 && sorted.count { it in 1..22 } == 3
+                        }
+                        CONDITION_END_DIGIT_FILTER -> generateOneWithValidator(favorites, excluded) { sorted ->
+                            var hasConsecutive = false
+                            for (j in 0 until sorted.size - 1) {
+                                if (sorted[j + 1] - sorted[j] == 1) { hasConsecutive = true; break }
+                            }
+                            val endDigits = sorted.map { it % 10 }
+                            !hasConsecutive && endDigits.toSet().size == endDigits.size
+                        }
+                        CONDITION_COMPANION_NUMBERS -> generateOneCompanionSet(favorites, excluded, allDraws)
+                        CONDITION_FREQUENCY -> generateOneFrequencySet(favorites, excluded, allDraws)
+                        else -> generateOneSmartSet(favorites, excluded, allowConsecutive)
+                    }
+                }
+
+                _numberSets.value = generatedSets
+                _randomMixLabels.value = pickedConditions
+                _randomPickedCondition.value = pickedConditions.map { shortConditionLabel(it) }.distinct().joinToString(" · ")
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isGenerating.value = false
+            }
         }
     }
 
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
-            val label = effectiveConditionLabel()
+            val mixLabels = _randomMixLabels.value
+            val isMixed = _selectedCondition.value == CONDITION_RANDOM_PICK && mixLabels != null
             viewModelScope.launch {
-                current.forEach { numbers ->
+                current.forEachIndexed { index, numbers ->
+                    val label = if (isMixed && index < mixLabels!!.size) {
+                        "$CONDITION_RANDOM_PICK (${mixLabels[index]})"
+                    } else {
+                        effectiveConditionLabel()
+                    }
                     repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
                 }
                 _saveMessage.value =
@@ -1035,9 +1277,18 @@ class AnalysisViewModel @Inject constructor(
 
     /**
      * 조합 하나만 골라서 내역에 저장한다. (전체 저장과 별개로, 마음에 드는 조합만 개별 저장할 때 사용)
+     * index는 "전체 분석 조건 랜덤"으로 생성된 조합일 때, numberSets 안에서 몇 번째 조합인지를 받아서
+     * 그 조합에 실제로 쓰인 조건을 저장 라벨에 정확히 남기기 위함이다 (섞여 나온 조합마다 조건이 다르므로).
      */
-    fun saveSingleSet(numbers: List<Int>) {
-        val label = effectiveConditionLabel()
+    fun saveSingleSet(numbers: List<Int>, index: Int? = null) {
+        val mixLabels = _randomMixLabels.value
+        val label = if (_selectedCondition.value == CONDITION_RANDOM_PICK &&
+            mixLabels != null && index != null && index < mixLabels.size
+        ) {
+            "$CONDITION_RANDOM_PICK (${mixLabels[index]})"
+        } else {
+            effectiveConditionLabel()
+        }
         viewModelScope.launch {
             repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
             _saveMessage.value = "이 조합이 내역에 저장되었습니다!"

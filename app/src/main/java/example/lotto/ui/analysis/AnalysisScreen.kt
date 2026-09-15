@@ -86,6 +86,7 @@ fun AnalysisScreen(
     val isGenerating by viewModel.isGenerating.collectAsState()
     val sakaiInfoMessage by viewModel.sakaiInfoMessage.collectAsState()
     val randomPickedCondition by viewModel.randomPickedCondition.collectAsState()
+    val randomMixLabels by viewModel.randomMixLabels.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
     val favoriteNumbers by viewModel.favoriteNumbers.collectAsState()
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
@@ -369,7 +370,8 @@ fun AnalysisScreen(
                         setIndex = index + 1,
                         numbers = set,
                         initiallyExpanded = index == 0,
-                        onSaveClick = { viewModel.saveSingleSet(set) }
+                        onSaveClick = { viewModel.saveSingleSet(set, index) },
+                        conditionLabel = randomMixLabels?.getOrNull(index)
                     )
                 }
             }
@@ -1386,7 +1388,7 @@ fun SmartPatternAnalysisSection(
             if (currentCondition == CONDITION_RANDOM_PICK && !randomPickedCondition.isNullOrBlank()) {
                 Surface(color = Color(0xFFFFF7ED), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "🎲 이번엔 \"$randomPickedCondition\"으로 뽑았어요",
+                        text = "🎲 이번엔 $randomPickedCondition 조건을 섞어서 뽑았어요 (조합마다 표시)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFC2410C),
@@ -2345,7 +2347,8 @@ fun LottoSetCard(
     setIndex: Int,
     numbers: List<Int>,
     initiallyExpanded: Boolean = false,
-    onSaveClick: () -> Unit = {}
+    onSaveClick: () -> Unit = {},
+    conditionLabel: String? = null
 ) {
     val context = LocalContext.current
     val freeSimUsesToday by viewModel.freeSimUsesToday.collectAsState()
@@ -2375,6 +2378,22 @@ fun LottoSetCard(
                     color = Color(0xFF64748B),
                     fontSize = 13.sp
                 )
+                if (conditionLabel != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    val badgeColor = conditionAccentColor(conditionLabel)
+                    Surface(
+                        color = badgeColor.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "${conditionEmoji(conditionLabel)} ${conditionLabel.substringBefore("(").trim()}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeColor,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
                 if (numbers.any { it in watchlistNumbers }) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
