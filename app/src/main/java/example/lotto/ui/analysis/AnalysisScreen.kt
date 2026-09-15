@@ -7,6 +7,8 @@ import com.google.android.play.core.review.ReviewManagerFactory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -39,6 +41,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1254,23 +1258,45 @@ fun SmartPatternAnalysisSection(
                 label = "scale"
             )
 
+            // 누르는 순간 "눌렸다"는 게 확실히 느껴지도록 별도의 프레스 상태를 추적한다.
+            // 펄스 애니메이션과는 별개로, 손가락이 닿아있는 동안만 살짝 눌린 크기로 줄어든다.
+            val generateButtonInteractionSource = remember { MutableInteractionSource() }
+            val isGenerateButtonPressed by generateButtonInteractionSource.collectIsPressedAsState()
+            val pressScale by animateFloatAsState(
+                targetValue = if (isGenerateButtonPressed) 0.96f else 1f,
+                animationSpec = tween(100),
+                label = "pressScale"
+            )
+            val haptic = LocalHapticFeedback.current
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)
-                    .scale(if (isGenerating) 1f else pulseScale)
+                    .scale(if (isGenerating) 1f else pulseScale * pressScale)
                     .shadow(
-                        elevation = if (isGenerating) 0.dp else 10.dp,
+                        elevation = if (isGenerating) 0.dp else if (isGenerateButtonPressed) 3.dp else 10.dp,
                         shape = RoundedCornerShape(16.dp),
                         ambientColor = Color(0xFF7C3AED),
                         spotColor = Color(0xFF7C3AED)
                     )
                     .clip(RoundedCornerShape(16.dp))
                     .background(
-                        if (isGenerating) Brush.horizontalGradient(listOf(Color(0xFF93C5FD), Color(0xFF93C5FD)))
-                        else Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                        when {
+                            isGenerating -> Brush.horizontalGradient(listOf(Color(0xFF93C5FD), Color(0xFF93C5FD)))
+                            // 눌려있는 동안은 원래 색보다 한 톤 어둡게 바꿔서 "눌림"을 색으로도 보여준다.
+                            isGenerateButtonPressed -> Brush.horizontalGradient(listOf(Color(0xFF0C86C4), Color(0xFF6423A8)))
+                            else -> Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                        }
                     )
-                    .clickable(enabled = !isGenerating) { onGenerateClick() },
+                    .clickable(
+                        enabled = !isGenerating,
+                        interactionSource = generateButtonInteractionSource,
+                        indication = null // 커스텀 스케일+색 피드백을 쓰므로 기본 리플은 꺼서 겹치지 않게 한다
+                    ) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onGenerateClick()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (isGenerating) {
