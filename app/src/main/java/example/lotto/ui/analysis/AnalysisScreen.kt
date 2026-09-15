@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import android.os.Build
@@ -1247,10 +1248,23 @@ fun SmartPatternAnalysisSection(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // "AI 추천 번호 생성하기" 버튼 - 계속 움직이는 펄스 애니메이션은 오히려
-            // "지금 눌러서 반응한 건지, 원래 움직이던 건지" 헷갈리게 만들어서 제거했다.
-            // 대신 평소엔 정적으로 굵고 진하게 강조하고, 실제로 누르는 순간에만
-            // (스케일 축소 + 색 어두워짐 + 진동) 세 가지 반응이 겹쳐서 확실히 느껴지게 한다.
+            // "AI 추천 번호 생성하기" 버튼 - 눌러야 번호가 생성된다는 느낌을 강하게 주기 위해
+            // 그라데이션 + 그림자를 적용했다. 크기(스케일)를 계속 움직이는 펄스는 "눌림" 반응과
+            // 헷갈려서 뺐고, 대신 색상만 천천히 흐르게 해 정적이지 않으면서도 눌림 신호와는
+            // 겹치지 않는 "포인트"를 줬다. 누르는 순간엔 색 애니메이션과 무관하게 무조건
+            // 어두운 색으로 덮어써서, 흐르던 색이 몇 시였든 "눌림"만큼은 항상 또렷하게 보이게 했다.
+            val infiniteColorTransition = rememberInfiniteTransition(label = "generateButtonColorShift")
+            val colorProgress by infiniteColorTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(3000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "colorShift"
+            )
+            val gradientStart = lerp(Color(0xFF0EA5E9), Color(0xFF06B6D4), colorProgress) // 파랑 ↔ 청록
+            val gradientEnd = lerp(Color(0xFF7C3AED), Color(0xFFDB2777), colorProgress)   // 보라 ↔ 분홍
 
             // 누르는 순간 "눌렸다"는 게 확실히 느껴지도록 프레스 상태를 추적한다.
             val generateButtonInteractionSource = remember { MutableInteractionSource() }
@@ -1297,9 +1311,9 @@ fun SmartPatternAnalysisSection(
                     .background(
                         when {
                             isGenerating -> Brush.horizontalGradient(listOf(Color(0xFF93C5FD), Color(0xFF93C5FD)))
-                            // 눌려있는 동안은 원래 색보다 한 톤 어둡게 바꿔서 "눌림"을 색으로도 보여준다.
+                            // 눌려있는 동안은 색 애니메이션과 무관하게 항상 어두운 톤으로 덮어써서 "눌림"을 또렷하게 보여준다.
                             isGenerateButtonPressed -> Brush.horizontalGradient(listOf(Color(0xFF0C86C4), Color(0xFF6423A8)))
-                            else -> Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED)))
+                            else -> Brush.horizontalGradient(listOf(gradientStart, gradientEnd))
                         }
                     )
                     .clickable(
