@@ -21,16 +21,17 @@ jobs:
 
       # 새 빌드를 시작하기 전에, 이 저장소에 쌓여 있는 아티팩트 중 "최근 20개"만 남기고
       # 그보다 오래된 것들을 지운다. 최근 20개는 롤백/재배포 대비용으로 남겨둔다.
-      # ubuntu-latest 러너엔 GitHub CLI(gh)가 기본 설치돼 있어서 별도 액션 설치 없이 바로 쓸 수 있다.
-      # --slurp로 모든 페이지를 한 번에 모은 뒤, created_at 기준 최신순 정렬 → 앞 20개(최신)를
-      # 건너뛰고 나머지(21번째부터, 오래된 것들)만 삭제 대상으로 뽑는다.
+      # ubuntu-latest 러너엔 GitHub CLI(gh)와 jq가 기본 설치돼 있어서 별도 액션 설치 없이 바로 쓸 수 있다.
+      # ⚠️ gh api는 --slurp와 -q(jq 쿼리)를 동시에 쓸 수 없어서, 먼저 -q로 아티팩트를 한 줄에
+      # 하나씩(JSON) 뽑아낸 뒤, 그 결과 전체를 별도의 jq -s(slurp)로 모아 정렬·필터링한다.
       - name: Delete Old Artifacts (keep latest 20)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Looking for artifacts older than the most recent 20 in ${{ github.repository }}..."
-          ARTIFACT_IDS=$(gh api "repos/${{ github.repository }}/actions/artifacts" --paginate --slurp \
-            -q '[.[].artifacts[]] | sort_by(.created_at) | reverse | .[20:] | .[].id')
+          ARTIFACT_IDS=$(gh api "repos/${{ github.repository }}/actions/artifacts" --paginate \
+            -q '.artifacts[] | {id, created_at}' \
+            | jq -s 'sort_by(.created_at) | reverse | .[20:] | .[].id')
 
           if [ -z "$ARTIFACT_IDS" ]; then
             echo "20 or fewer artifacts exist. Nothing to delete."
