@@ -134,6 +134,7 @@ const val CONDITION_BALANCE_FILTER = "홀짝 / 고저 균형 필터링"
 const val CONDITION_END_DIGIT_FILTER = "끝수 및 연속 번호 조합 제한"
 const val CONDITION_COMPANION_NUMBERS = "동반수 분석 (자주 같이 나온 번호)"
 const val CONDITION_FREQUENCY = "다빈도 번호 분석 (전체 회차 기준)"
+const val CONDITION_RANDOM_PICK = "전체 분석 조건 랜덤"
 
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
@@ -156,6 +157,12 @@ class AnalysisViewModel @Inject constructor(
 
     private val _sakaiInfoMessage = MutableStateFlow<String?>(null)
     val sakaiInfoMessage: StateFlow<String?> = _sakaiInfoMessage.asStateFlow()
+
+    // "전체 분석 조건 랜덤"에서 실제로 어떤 조건이 뽑혔는지 화면에 안내하기 위한 상태.
+    // sakaiInfoMessage와 별개로 둔 이유는, 뽑힌 조건(예: 다빈도 분석)이 자기 자신의
+    // info 메시지를 또 세팅해버려서 "랜덤으로 뽑혔다"는 사실 자체가 묻히지 않게 하기 위함이다.
+    private val _randomPickedCondition = MutableStateFlow<String?>(null)
+    val randomPickedCondition: StateFlow<String?> = _randomPickedCondition.asStateFlow()
 
     // 즐겨찾는 번호(항상 포함) / 기피 번호(항상 제외) 설정을 앱을 껐다 켜도 유지하기 위해 SharedPreferences에 저장한다.
     private val prefs = application.getSharedPreferences("lotto_number_prefs", Context.MODE_PRIVATE)
@@ -327,6 +334,9 @@ class AnalysisViewModel @Inject constructor(
 
     fun setCondition(condition: String) {
         _selectedCondition.value = condition
+        if (condition != CONDITION_RANDOM_PICK) {
+            _randomPickedCondition.value = null
+        }
     }
 
     /**
@@ -958,10 +968,61 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 저장할 때 쓸 조건 라벨을 계산한다. 평소엔 선택된 조건명을 그대로 쓰지만,
+     * "전체 분석 조건 랜덤"으로 생성한 경우엔 실제로 어떤 조건이 뽑혔는지까지 같이 남겨야
+     * 나중에 내역에서 봤을 때 "이게 무슨 로직으로 나온 번호였지?"를 알 수 있다.
+     */
+    private fun effectiveConditionLabel(): String {
+        val selected = _selectedCondition.value
+        val picked = _randomPickedCondition.value
+        return if (selected == CONDITION_RANDOM_PICK && !picked.isNullOrBlank()) {
+            "$CONDITION_RANDOM_PICK ($picked)"
+        } else {
+            selected
+        }
+    }
+
+    /**
+     * "전체 분석 조건 랜덤": 어떤 조건을 골라야 할지 모르겠는 사용자를 위해, 무료(광고 없는)
+     * 기본 분석 조건 중 하나를 무작위로 뽑아서 대신 실행해준다.
+     * ⚠️ 유전 알고리즘·역발상 기댓값(AI 고급 분석)은 광고 시청이 필요한 조건이라 이 풀에서 제외했다.
+     * "가볍게 아무거나 뽑아보는" 기능에서 갑자기 광고가 뜨면 사용자 입장에서 당황스러울 수 있어서다.
+     */
+    private val randomPickPool = listOf(
+        CONDITION_ADVANCED,
+        CONDITION_SAKAI,
+        CONDITION_CARRYOVER,
+        CONDITION_RANDOM,
+        CONDITION_AC_FILTER,
+        CONDITION_BALANCE_FILTER,
+        CONDITION_END_DIGIT_FILTER,
+        CONDITION_COMPANION_NUMBERS,
+        CONDITION_FREQUENCY
+    )
+
+    fun generateRandomConditionNumbers(setCount: Int) {
+        _sakaiInfoMessage.value = null
+        val picked = randomPickPool.random()
+        _randomPickedCondition.value = picked
+
+        when (picked) {
+            CONDITION_ADVANCED -> generateSmartNumbers(setCount)
+            CONDITION_SAKAI -> generateSakaiNumbers(setCount)
+            CONDITION_CARRYOVER -> generateCarryoverNumbers(setCount)
+            CONDITION_RANDOM -> generateRandomNumbers(setCount)
+            CONDITION_AC_FILTER -> generateAcFilteredNumbers(setCount)
+            CONDITION_BALANCE_FILTER -> generateBalancedNumbers(setCount)
+            CONDITION_END_DIGIT_FILTER -> generateEndDigitFilteredNumbers(setCount)
+            CONDITION_COMPANION_NUMBERS -> generateCompanionNumbers(setCount)
+            CONDITION_FREQUENCY -> generateFrequencyNumbers(setCount)
+        }
+    }
+
     fun saveNumbers() {
         val current = _numberSets.value
         if (current.isNotEmpty()) {
-            val label = _selectedCondition.value
+            val label = effectiveConditionLabel()
             viewModelScope.launch {
                 current.forEach { numbers ->
                     repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
@@ -976,7 +1037,7 @@ class AnalysisViewModel @Inject constructor(
      * 조합 하나만 골라서 내역에 저장한다. (전체 저장과 별개로, 마음에 드는 조합만 개별 저장할 때 사용)
      */
     fun saveSingleSet(numbers: List<Int>) {
-        val label = _selectedCondition.value
+        val label = effectiveConditionLabel()
         viewModelScope.launch {
             repository.insertLotto(numbers, "ANALYSIS", conditionLabel = label)
             _saveMessage.value = "이 조합이 내역에 저장되었습니다!"

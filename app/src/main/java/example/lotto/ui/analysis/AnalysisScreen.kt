@@ -85,6 +85,7 @@ fun AnalysisScreen(
     val selectedCondition by viewModel.selectedCondition.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
     val sakaiInfoMessage by viewModel.sakaiInfoMessage.collectAsState()
+    val randomPickedCondition by viewModel.randomPickedCondition.collectAsState()
     val saveMessage by viewModel.saveMessage.collectAsState()
     val favoriteNumbers by viewModel.favoriteNumbers.collectAsState()
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
@@ -210,6 +211,7 @@ fun AnalysisScreen(
                                 CONDITION_END_DIGIT_FILTER -> viewModel.generateEndDigitFilteredNumbers(selectedSetCount)
                                 CONDITION_COMPANION_NUMBERS -> viewModel.generateCompanionNumbers(selectedSetCount)
                                 CONDITION_FREQUENCY -> viewModel.generateFrequencyNumbers(selectedSetCount)
+                                CONDITION_RANDOM_PICK -> viewModel.generateRandomConditionNumbers(selectedSetCount)
                                 CONDITION_GENETIC -> viewModel.generateGeneticAlgorithmNumbers(selectedSetCount)
                                 CONDITION_EXPECTED_VALUE -> viewModel.generateExpectedValueNumbers(selectedSetCount)
                                 else -> viewModel.generateSmartNumbers(selectedSetCount) // CONDITION_ADVANCED(기본값) 등
@@ -241,6 +243,7 @@ fun AnalysisScreen(
                     onToggleAllowConsecutive = { viewModel.setAllowConsecutiveNumbers(it) },
                     isGenerating = isGenerating,
                     sakaiInfoMessage = sakaiInfoMessage,
+                    randomPickedCondition = randomPickedCondition,
                     currentCondition = selectedCondition
                 )
             }
@@ -1055,6 +1058,7 @@ fun SmartPatternAnalysisSection(
     onToggleAllowConsecutive: (Boolean) -> Unit = {},
     isGenerating: Boolean = false,
     sakaiInfoMessage: String? = null,
+    randomPickedCondition: String? = null,
     currentCondition: String = ""
 ) {
     Card(
@@ -1379,9 +1383,23 @@ fun SmartPatternAnalysisSection(
                 }
             }
 
+            if (currentCondition == CONDITION_RANDOM_PICK && !randomPickedCondition.isNullOrBlank()) {
+                Surface(color = Color(0xFFFFF7ED), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "🎲 이번엔 \"$randomPickedCondition\"으로 뽑았어요",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFC2410C),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
             if ((currentCondition == CONDITION_SAKAI || currentCondition == CONDITION_CARRYOVER ||
                         currentCondition == CONDITION_GENETIC || currentCondition == CONDITION_EXPECTED_VALUE ||
-                        currentCondition == CONDITION_COMPANION_NUMBERS || currentCondition == CONDITION_FREQUENCY) &&
+                        currentCondition == CONDITION_COMPANION_NUMBERS || currentCondition == CONDITION_FREQUENCY ||
+                        currentCondition == CONDITION_RANDOM_PICK) &&
                 !sakaiInfoMessage.isNullOrBlank()) {
                 Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -4014,6 +4032,7 @@ private fun conditionEmoji(condition: String): String = when (condition) {
     CONDITION_END_DIGIT_FILTER -> "🔢"
     CONDITION_COMPANION_NUMBERS -> "🤝"
     CONDITION_FREQUENCY -> "📊"
+    CONDITION_RANDOM_PICK -> "🎲"
     else -> "✨"
 }
 
@@ -4027,6 +4046,7 @@ private fun conditionSubtitle(condition: String): String = when (condition) {
     CONDITION_END_DIGIT_FILTER -> "끝자리 중복과 연속번호를 줄인 조합으로 구성"
     CONDITION_COMPANION_NUMBERS -> "즐겨찾기 번호와 자주 같이 나온 동반수 위주로 구성 (참고용)"
     CONDITION_FREQUENCY -> "전체 회차 데이터 기준, 가장 많이 나온 번호 위주로 구성 (참고용)"
+    CONDITION_RANDOM_PICK -> "어떤 조건이 좋을지 모르겠다면? 무료 분석 조건 중 하나를 무작위로 뽑아서 생성해요"
     else -> ""
 }
 
@@ -4040,6 +4060,7 @@ private fun conditionAccentColor(condition: String): Color = when (condition) {
     CONDITION_END_DIGIT_FILTER -> Color(0xFFDB2777)
     CONDITION_COMPANION_NUMBERS -> Color(0xFF0891B2)
     CONDITION_FREQUENCY -> Color(0xFFCA8A04)
+    CONDITION_RANDOM_PICK -> Color(0xFFC2410C)
     else -> Color(0xFF0284C7)
 }
 
@@ -4051,6 +4072,7 @@ fun ConditionSelectDialog(
 ) {
     val premiumConditions = listOf(CONDITION_GENETIC, CONDITION_EXPECTED_VALUE)
     val basicConditions = listOf(
+        CONDITION_RANDOM_PICK,
         CONDITION_ADVANCED,
         CONDITION_SAKAI,
         CONDITION_CARRYOVER,
