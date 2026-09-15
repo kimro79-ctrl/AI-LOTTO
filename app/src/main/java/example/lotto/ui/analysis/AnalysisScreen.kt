@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1266,6 +1267,19 @@ fun SmartPatternAnalysisSection(
             val gradientStart = lerp(Color(0xFF0EA5E9), Color(0xFF06B6D4), colorProgress) // 파랑 ↔ 청록
             val gradientEnd = lerp(Color(0xFF7C3AED), Color(0xFFDB2777), colorProgress)   // 보라 ↔ 분홍
 
+            // 대각선으로 훑고 지나가는 반짝임(샤이머) - 크기/색 베이스와는 완전히 다른 채널이라
+            // 눌림 반응과 헷갈릴 일 없이 "포인트"만 강하게 준다. 1.6초마다 왼쪽에서 오른쪽으로 반복.
+            val shimmerTransition = rememberInfiniteTransition(label = "generateButtonShimmer")
+            val shimmerProgress by shimmerTransition.animateFloat(
+                initialValue = -0.4f,
+                targetValue = 1.4f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1600, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "shimmerProgress"
+            )
+
             // 누르는 순간 "눌렸다"는 게 확실히 느껴지도록 프레스 상태를 추적한다.
             val generateButtonInteractionSource = remember { MutableInteractionSource() }
             val isGenerateButtonPressed by generateButtonInteractionSource.collectIsPressedAsState()
@@ -1316,6 +1330,25 @@ fun SmartPatternAnalysisSection(
                             else -> Brush.horizontalGradient(listOf(gradientStart, gradientEnd))
                         }
                     )
+                    .drawWithContent {
+                        drawContent()
+                        // 생성 중/눌린 상태에서는 시선을 분산시키지 않도록 샤이머를 끈다.
+                        if (!isGenerating && !isGenerateButtonPressed) {
+                            val bandWidth = size.width * 0.22f
+                            val centerX = size.width * shimmerProgress
+                            drawRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.White.copy(alpha = 0.45f),
+                                        Color.Transparent
+                                    ),
+                                    start = Offset(centerX - bandWidth, 0f),
+                                    end = Offset(centerX + bandWidth, size.height)
+                                )
+                            )
+                        }
+                    }
                     .clickable(
                         enabled = !isGenerating,
                         interactionSource = generateButtonInteractionSource,
