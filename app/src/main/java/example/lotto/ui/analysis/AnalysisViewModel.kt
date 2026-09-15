@@ -996,8 +996,8 @@ class AnalysisViewModel @Inject constructor(
 
     /** generateWithValidator의 1회분 - "완전 무작위/AC값/홀짝고저/끝수연속" 4개 조건이 공유한다. */
     private fun generateOneWithValidator(
-        favorites: List<Int>,
-        excluded: List<Int>,
+        favorites: Set<Int>,
+        excluded: Set<Int>,
         validator: ((List<Int>) -> Boolean)?
     ): List<Int> {
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
@@ -1018,7 +1018,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /** generateSmartNumbers(고도화 종합 분석, 7대 로직)의 1회분. 앵커 구간은 매번 무작위로 하나 고른다. */
-    private fun generateOneSmartSet(favorites: List<Int>, excluded: List<Int>, allowConsecutive: Boolean): List<Int> {
+    private fun generateOneSmartSet(favorites: Set<Int>, excluded: Set<Int>, allowConsecutive: Boolean): List<Int> {
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
         val anchorRange = listOf(1..15, 1..15, 10..30, 10..30, 1..45).random()
         var resultSet = mutableSetOf<Int>()
@@ -1063,7 +1063,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /** generateSakaiNumbers의 1회분. */
-    private fun generateOneSakaiSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+    private fun generateOneSakaiSet(favorites: Set<Int>, excluded: Set<Int>, allDraws: List<HistoricalDraw>): List<Int> {
         val recentWeeks = allDraws.sortedByDescending { it.drawNo }.take(26)
         if (recentWeeks.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
 
@@ -1099,7 +1099,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /** generateCarryoverNumbers의 1회분. */
-    private fun generateOneCarryoverSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+    private fun generateOneCarryoverSet(favorites: Set<Int>, excluded: Set<Int>, allDraws: List<HistoricalDraw>): List<Int> {
         val recentDraws = allDraws.sortedByDescending { it.drawNo }.take(3)
         if (recentDraws.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
 
@@ -1119,7 +1119,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /** generateCompanionNumbers의 1회분. */
-    private fun generateOneCompanionSet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+    private fun generateOneCompanionSet(favorites: Set<Int>, excluded: Set<Int>, allDraws: List<HistoricalDraw>): List<Int> {
         val candidatePool = (1..45).filter { it !in excluded && it !in favorites }
         if (allDraws.isEmpty() || candidatePool.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
 
@@ -1141,7 +1141,7 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /** generateFrequencyNumbers의 1회분. */
-    private fun generateOneFrequencySet(favorites: List<Int>, excluded: List<Int>, allDraws: List<HistoricalDraw>): List<Int> {
+    private fun generateOneFrequencySet(favorites: Set<Int>, excluded: Set<Int>, allDraws: List<HistoricalDraw>): List<Int> {
         if (allDraws.isEmpty()) return generateOneWithValidator(favorites, excluded, null)
 
         val counts = IntArray(46)
