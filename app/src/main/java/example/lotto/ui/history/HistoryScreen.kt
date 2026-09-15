@@ -38,8 +38,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,8 +73,7 @@ import java.util.Locale
 private enum class HistoryFilter(val label: String, val matchTypes: Set<String>?) {
     ALL("전체", null),
     ANALYSIS("스마트 분석", setOf("ANALYSIS")),
-    FORTUNE("운세", setOf("FORTUNE", "TAROT")),
-    QR("QR 스캔", setOf("QR"))
+    FORTUNE("운세", setOf("FORTUNE", "TAROT"))
 }
 
 private enum class HistorySort(val label: String) {
@@ -561,6 +558,28 @@ private fun resolveTypeLabel(entity: LottoEntity): String {
 }
 
 /**
+ * 조건명에 포함된 키워드로 포인트 컬러를 정한다. AnalysisScreen.kt의 "분석 조건 선택" 목록에서
+ * 쓰는 색상 팔레트와 최대한 맞춰서, 어느 화면에서 봐도 같은 조건은 같은 색으로 보이게 했다.
+ * 정확히 일치하지 않아도(예: 회차 정보가 라벨에 덧붙는 경우) 대비되도록 포함 여부로 판단한다.
+ */
+private fun conditionAccentColor(typeLabel: String): Color = when {
+    typeLabel.contains("고도화") -> Color(0xFF7C3AED)
+    typeLabel.contains("사카이") -> Color(0xFFF97316)
+    typeLabel.contains("이월수") -> Color(0xFF10B981)
+    typeLabel.contains("무작위") -> Color(0xFF64748B)
+    typeLabel.contains("AC값") -> Color(0xFF0D9488)
+    typeLabel.contains("홀짝") || typeLabel.contains("고저") -> Color(0xFF0EA5E9)
+    typeLabel.contains("끝수") || typeLabel.contains("연속") -> Color(0xFFEC4899)
+    typeLabel.contains("동반수") -> Color(0xFF0891B2)
+    typeLabel.contains("다빈도") -> Color(0xFFCA8A04)
+    typeLabel.contains("유전") -> Color(0xFFEA580C)
+    typeLabel.contains("기댓값") || typeLabel.contains("역발상") -> Color(0xFF6D28D9)
+    typeLabel.contains("운세") -> Color(0xFFDB2777)
+    typeLabel.contains("QR") -> Color(0xFF94A3B8)
+    else -> Color(0xFF7C3AED)
+}
+
+/**
  * 저장된 조합을 카카오톡/문자 등으로 공유할 때 쓸 텍스트를 만든다.
  * 표준 공유 시트(Intent.ACTION_SEND)를 그대로 활용하므로, 사용자가 목록에서
  * 카카오톡·문자·기타 앱 중 원하는 것을 골라 보낼 수 있다.
@@ -658,36 +677,52 @@ fun HistoryItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 라벨 줄에 weight(1f)를 줘서, 조건 문구가 길어도 아이콘 영역을 밀어내지 않고
-                // 말줄임표(...)로 잘리도록 했다. (예전에 번호 볼이 잘리던 문제와 같은 원인이라 같은 방식으로 고침)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                // 조건명과 날짜를 한 줄에 우겨넣으면(예전 방식) 조건명이 길 때 날짜가 잘려서
+                // "2026-0..."처럼 보이는 문제가 있었다. 조건명(색 점 포함)을 한 줄로 두고,
+                // 날짜는 그 아래 작은 글씨로 따로 둬서 항상 전체가 다 보이게 했다.
+                Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "[$typeLabel] ${entity.date}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (hasRound) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(conditionAccentColor(typeLabel))
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            color = Color(0xFF7C3AED).copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "${entity.round}회차",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF7C3AED),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
+                        Text(
+                            text = typeLabel,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF334155),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (hasRound) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                color = Color(0xFF7C3AED).copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "${entity.round}회차",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF7C3AED),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = entity.date,
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.padding(start = 14.dp)
+                    )
                 }
                 if (isSelectionMode) {
                     // 선택 모드에서는 개별 공유/삭제 대신 체크박스만 보여줘서 화면을 단순하게 유지한다.
@@ -740,21 +775,28 @@ fun HistoryItem(
             }
 
             if (numberList.size == 6 && !isSelectionMode) {
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = {
-                        showBacktestDialog = true
-                        if (backtestResult == null && !isLoadingBacktest) runBacktest()
-                    },
-                    modifier = Modifier.fillMaxWidth().height(38.dp),
-                    shape = RoundedCornerShape(10.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            showBacktestDialog = true
+                            if (backtestResult == null && !isLoadingBacktest) runBacktest()
+                        }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "📜 과거 당첨 이력 보기",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF7C3AED)
                     )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
                 }
             }
         }
