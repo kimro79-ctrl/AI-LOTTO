@@ -41,8 +41,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1244,22 +1247,12 @@ fun SmartPatternAnalysisSection(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // "AI 추천 번호 생성하기" 버튼 - 눌러야 번호가 생성된다는 느낌을 강하게 주기 위해
-            // 그라데이션 + 그림자 + 은은한 펄스(맥박) 애니메이션을 적용했다.
-            // 생성 중일 때는 애니메이션을 멈추고 흐린 색으로 바꿔 "지금은 못 누른다"는 걸 명확히 한다.
-            val infiniteTransition = rememberInfiniteTransition(label = "generateButtonPulse")
-            val pulseScale by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 1.035f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(900, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "scale"
-            )
+            // "AI 추천 번호 생성하기" 버튼 - 계속 움직이는 펄스 애니메이션은 오히려
+            // "지금 눌러서 반응한 건지, 원래 움직이던 건지" 헷갈리게 만들어서 제거했다.
+            // 대신 평소엔 정적으로 굵고 진하게 강조하고, 실제로 누르는 순간에만
+            // (스케일 축소 + 색 어두워짐 + 진동) 세 가지 반응이 겹쳐서 확실히 느껴지게 한다.
 
-            // 누르는 순간 "눌렸다"는 게 확실히 느껴지도록 별도의 프레스 상태를 추적한다.
-            // 펄스 애니메이션과는 별개로, 손가락이 닿아있는 동안만 살짝 눌린 크기로 줄어든다.
+            // 누르는 순간 "눌렸다"는 게 확실히 느껴지도록 프레스 상태를 추적한다.
             val generateButtonInteractionSource = remember { MutableInteractionSource() }
             val isGenerateButtonPressed by generateButtonInteractionSource.collectIsPressedAsState()
             val pressScale by animateFloatAsState(
@@ -1267,15 +1260,35 @@ fun SmartPatternAnalysisSection(
                 animationSpec = tween(100),
                 label = "pressScale"
             )
-            val haptic = LocalHapticFeedback.current
+            val context = LocalContext.current
+
+            // 시스템 "터치 피드백" 설정이 꺼져 있어도 확실히 진동이 울리도록,
+            // performHapticFeedback 대신 Vibrator를 직접 호출한다.
+            fun vibrateGenerateButton() {
+                val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    manager?.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                }
+                if (vibrator?.hasVibrator() == true) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(35)
+                    }
+                }
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp)
-                    .scale(if (isGenerating) 1f else pulseScale * pressScale)
+                    .height(56.dp)
+                    .scale(if (isGenerating) 1f else pressScale)
                     .shadow(
-                        elevation = if (isGenerating) 0.dp else if (isGenerateButtonPressed) 3.dp else 10.dp,
+                        elevation = if (isGenerating) 0.dp else if (isGenerateButtonPressed) 3.dp else 14.dp,
                         shape = RoundedCornerShape(16.dp),
                         ambientColor = Color(0xFF7C3AED),
                         spotColor = Color(0xFF7C3AED)
@@ -1294,7 +1307,7 @@ fun SmartPatternAnalysisSection(
                         interactionSource = generateButtonInteractionSource,
                         indication = null // 커스텀 스케일+색 피드백을 쓰므로 기본 리플은 꺼서 겹치지 않게 한다
                     ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        vibrateGenerateButton()
                         onGenerateClick()
                     },
                 contentAlignment = Alignment.Center
