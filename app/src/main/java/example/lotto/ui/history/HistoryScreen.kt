@@ -695,7 +695,7 @@ fun HistoryItem(
                             text = typeLabel,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF334155),
+                            color = conditionAccentColor(typeLabel),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
