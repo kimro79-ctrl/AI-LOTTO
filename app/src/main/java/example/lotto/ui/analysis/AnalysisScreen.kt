@@ -129,6 +129,7 @@ fun AnalysisScreen(
         com.kimro.ai.lotto.ads.RewardedAdManager.preload(context)
         com.kimro.ai.lotto.ads.RewardedAdManager.preload(context, com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_GENETIC_ALGORITHM)
         com.kimro.ai.lotto.ads.RewardedAdManager.preload(context, com.kimro.ai.lotto.ads.RewardedAdManager.AD_UNIT_EXPECTED_VALUE)
+        com.kimro.ai.lotto.ads.InterstitialAdManager.preload(context)
     }
 
     Scaffold(
@@ -232,7 +233,18 @@ fun AnalysisScreen(
                                 runGeneration()
                             }
                         } else {
-                            runGeneration()
+                            // 유전 알고리즘·역발상 기댓값을 제외한 나머지 무료 조건들은, 여기서
+                            // 가끔(1/10 확률, 쿨다운 있음) 전면 광고가 자동으로 뜬 뒤 생성이 이어진다.
+                            val activity = context as? android.app.Activity
+                            if (activity != null && com.kimro.ai.lotto.ads.InterstitialAdManager.shouldShowGenerateAd()) {
+                                com.kimro.ai.lotto.ads.InterstitialAdManager.showAd(
+                                    activity = activity,
+                                    onAdClosed = { runGeneration() },
+                                    onAdUnavailable = { runGeneration() } // 광고가 준비 안 됐으면 기능 자체는 막지 않는다
+                                )
+                            } else {
+                                runGeneration()
+                            }
                         }
                     },
                     favoriteNumbers = favoriteNumbers,
