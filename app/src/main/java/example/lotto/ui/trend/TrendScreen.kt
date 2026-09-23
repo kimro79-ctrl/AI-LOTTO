@@ -4,8 +4,10 @@ package com.kimro.ai.lotto.ui.trend
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +35,7 @@ fun TrendScreen() {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showHotColdDialog by remember { mutableStateOf(false) }
+    var showSectionDetailDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun load() {
@@ -128,13 +131,22 @@ fun TrendScreen() {
                         else recent10.sumOf { d -> d.numbers.count { it in 1..22 } } * 100 / totalNumbers
                     }
 
-                    // 구간별 출현 분포 (전체 회차 기준)
+                    // 구간별 출현 분포 (전체 회차 기준) — 색상은 LottoBall의 구간별 색과 맞춰서
+                    // 앱 전체에서 "이 색 = 이 구간"이라는 의미가 통일되게 했다.
                     val sectionLabels = listOf("1-9", "10-18", "19-27", "28-36", "37-45")
                     val sectionRanges = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
+                    val sectionColors = listOf(
+                        Color(0xFFF59E0B), // 1-9 주황
+                        Color(0xFF3B82F6), // 10-18 파랑
+                        Color(0xFFEF4444), // 19-27 빨강
+                        Color(0xFF64748B), // 28-36 회색
+                        Color(0xFF10B981)  // 37-45 초록
+                    )
                     val sectionCounts = remember(draws) {
                         sectionRanges.map { range -> draws.sumOf { d -> d.numbers.count { it in range } } }
                     }
                     val maxSectionCount = (sectionCounts.maxOrNull() ?: 0).coerceAtLeast(1)
+                    val totalSectionNumbers = sectionCounts.sum()
 
                     TrendCard(emoji = "🔥", title = "전체 회차 다빈도 TOP 5") {
                         MiniBallRow(items = hotTop5, ballColor = Color(0xFFEF4444))
@@ -169,26 +181,44 @@ fun TrendScreen() {
                                 modifier = Modifier.weight(1f),
                                 leftLabel = "홀 $oddPercent%",
                                 rightLabel = "짝 ${100 - oddPercent}%",
-                                percent = oddPercent
+                                percent = oddPercent,
+                                barColor = Color(0xFF7C3AED) // 홀짝 = 보라
                             )
                             RatioBar(
                                 modifier = Modifier.weight(1f),
                                 leftLabel = "저 $lowPercent%",
                                 rightLabel = "고 ${100 - lowPercent}%",
-                                percent = lowPercent
+                                percent = lowPercent,
+                                barColor = Color(0xFF0EA5E9) // 고저 = 파랑
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    TrendCard(emoji = "📊", title = "구간별 출현 분포 (전체 회차)") {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TrendCard(
+                        emoji = "📊",
+                        title = "구간별 출현 분포 (전체 회차)",
+                        onClick = { showSectionDetailDialog = true }
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             sectionCounts.forEachIndexed { index, count ->
+                                val percent = if (totalSectionNumbers > 0) count * 100 / totalSectionNumbers else 0
                                 SectionBar(
                                     label = sectionLabels[index],
-                                    ratio = count.toFloat() / maxSectionCount
+                                    ratio = count.toFloat() / maxSectionCount,
+                                    barColor = sectionColors[index],
+                                    countText = "${count}회 · $percent%"
                                 )
                             }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Text(
+                                text = "번호별 상세 보기 ›",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED)
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(24.dp))
@@ -200,11 +230,28 @@ fun TrendScreen() {
     if (showHotColdDialog) {
         HotColdDialog(onDismiss = { showHotColdDialog = false })
     }
+
+    if (showSectionDetailDialog && allDraws != null) {
+        SectionDetailDialog(
+            draws = allDraws!!,
+            onDismiss = { showSectionDetailDialog = false }
+        )
+    }
 }
 
 @Composable
-private fun TrendCard(emoji: String, title: String, content: @Composable ColumnScope.() -> Unit) {
-    Surface(color = Color.White, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+private fun TrendCard(
+    emoji: String,
+    title: String,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val cardModifier = if (onClick != null) {
+        Modifier.fillMaxWidth().clickable { onClick() }
+    } else {
+        Modifier.fillMaxWidth()
+    }
+    Surface(color = Color.White, shape = RoundedCornerShape(14.dp), modifier = cardModifier) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(emoji, fontSize = 15.sp)
@@ -215,6 +262,80 @@ private fun TrendCard(emoji: String, title: String, content: @Composable ColumnS
             content()
         }
     }
+}
+
+@Composable
+private fun SectionDetailDialog(draws: List<HistoricalDraw>, onDismiss: () -> Unit) {
+    val frequencies = remember(draws) { computeNumberFrequencies(draws) }
+    val countByNumber = remember(frequencies) { frequencies.associate { it.number to it.count } }
+
+    val sections = listOf(
+        Triple("1-9", 1..9, Color(0xFFF59E0B)),
+        Triple("10-18", 10..18, Color(0xFF3B82F6)),
+        Triple("19-27", 19..27, Color(0xFFEF4444)),
+        Triple("28-36", 28..36, Color(0xFF64748B)),
+        Triple("37-45", 37..45, Color(0xFF10B981))
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("구간별 출현 분포 상세", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "1,240여 회차 전체 기준, 번호 하나하나의 출현 횟수예요.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                sections.forEach { (label, range, color) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(color, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("$label 구간", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                    }
+                    range.chunked(5).forEach { rowNumbers ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                            rowNumbers.forEach { number ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(
+                                        modifier = Modifier.size(30.dp).background(color, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$number", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${countByNumber[number] ?: 0}회",
+                                        fontSize = 9.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기", color = Color(0xFF7C3AED)) }
+        }
+    )
 }
 
 @Composable
@@ -232,7 +353,7 @@ private fun MiniBallRow(items: List<NumberFrequency>, ballColor: Color) {
 }
 
 @Composable
-private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int) {
+private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int, barColor: Color) {
     Column(modifier = modifier) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(leftLabel, fontSize = 11.sp, color = Color(0xFF64748B))
@@ -249,29 +370,37 @@ private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabe
                 modifier = Modifier
                     .fillMaxWidth(fraction = (percent / 100f).coerceIn(0f, 1f))
                     .height(6.dp)
-                    .background(Color(0xFF7C3AED), RoundedCornerShape(3.dp))
+                    .background(barColor, RoundedCornerShape(3.dp))
             )
         }
     }
 }
 
 @Composable
-private fun SectionBar(label: String, ratio: Float) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, fontSize = 10.sp, color = Color(0xFF94A3B8), modifier = Modifier.width(40.dp))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(7.dp)
-                .background(Color(0xFFF1F5F9), RoundedCornerShape(4.dp))
-        ) {
+private fun SectionBar(label: String, ratio: Float, barColor: Color, countText: String) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, fontSize = 10.sp, color = Color(0xFF94A3B8), modifier = Modifier.width(40.dp))
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(fraction = ratio.coerceIn(0f, 1f))
-                    .height(7.dp)
-                    .background(Color(0xFF7C3AED), RoundedCornerShape(4.dp))
+                    .weight(1f)
+                    .height(9.dp)
+                    .background(Color(0xFFF1F5F9), RoundedCornerShape(4.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = ratio.coerceIn(0f, 1f))
+                        .height(9.dp)
+                        .background(barColor, RoundedCornerShape(4.dp))
+                )
+            }
+            Text(
+                text = countText,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = barColor,
+                modifier = Modifier.width(64.dp)
             )
         }
     }
 }
-
