@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -37,6 +38,7 @@ import com.kimro.ai.lotto.ui.fortune.FortuneScreen
 import com.kimro.ai.lotto.ui.history.HistoryScreen
 import com.kimro.ai.lotto.ui.history.HistoryViewModel
 import com.kimro.ai.lotto.ui.qr.QrScanScreen
+import com.kimro.ai.lotto.ui.trend.TrendScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
@@ -44,6 +46,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object Fortune : Screen("fortune", "운세", Icons.Default.DateRange)
     object QrScan : Screen("qr_scan", "QR당첨확인", Icons.Default.Search)
     object History : Screen("history", "내역", Icons.Default.List)
+    object Trend : Screen("trend", "최신경향", Icons.Default.Info)
 }
 
 @AndroidEntryPoint
@@ -68,12 +71,14 @@ class MainActivity : ComponentActivity() {
                             Screen.Analysis,
                             Screen.Fortune,
                             Screen.QrScan,
-                            Screen.History
+                            Screen.History,
+                            Screen.Trend
                         )
 
                         // 표준 NavigationBar는 내부 여백을 줄일 수 없어서, 직접 만든 Row로 교체했다.
                         // .windowInsetsPadding(WindowInsets.navigationBars)로 기기의 제스처바 영역만큼
                         // 자동으로 띄우고, 혹시 몰라 최소 8dp 여백도 추가로 깔아 안전하게 만든다.
+                        // 탭이 5개로 늘어난 만큼, 아이콘/여백을 살짝 줄여서 한 화면에 여유 있게 들어가게 했다.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -89,19 +94,19 @@ class MainActivity : ComponentActivity() {
                                 Column(
                                     modifier = Modifier
                                         .clickable { currentScreen = screen }
-                                        .padding(horizontal = 10.dp),
+                                        .padding(horizontal = 6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Icon(
                                         screen.icon,
                                         contentDescription = screen.title,
                                         tint = tint,
-                                        modifier = Modifier.size(26.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(modifier = Modifier.height(1.dp))
                                     Text(
                                         text = screen.title,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         maxLines = 1,
                                         color = tint
                                     )
@@ -121,6 +126,7 @@ class MainActivity : ComponentActivity() {
                             is Screen.Fortune -> FortuneScreen()
                             is Screen.QrScan -> QrScanScreen()
                             is Screen.History -> HistoryScreen(viewModel = historyViewModel)
+                            is Screen.Trend -> TrendScreen()
                         }
                     }
                 }
