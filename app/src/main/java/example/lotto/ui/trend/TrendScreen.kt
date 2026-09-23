@@ -217,11 +217,13 @@ fun TrendScreen() {
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED),
+                                maxLines = 1,
                                 modifier = Modifier
                                     .clickable { showSectionDetailDialog = true }
-                                    .padding(4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 8.dp)
                             )
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }
