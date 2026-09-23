@@ -36,6 +36,7 @@ fun TrendScreen() {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showHotColdDialog by remember { mutableStateOf(false) }
     var showSectionDetailDialog by remember { mutableStateOf(false) }
+    var showOddEvenDetailDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     fun load() {
@@ -122,14 +123,14 @@ fun TrendScreen() {
                     // 최근 10회 홀짝/고저 비율
                     val recent10 = remember(draws) { draws.sortedByDescending { it.drawNo }.take(10) }
                     val totalNumbers = recent10.size * 6
-                    val oddPercent = remember(recent10) {
-                        if (totalNumbers == 0) 0
-                        else recent10.sumOf { d -> d.numbers.count { it % 2 != 0 } } * 100 / totalNumbers
+                    val oddCount = remember(recent10) {
+                        recent10.sumOf { d -> d.numbers.count { it % 2 != 0 } }
                     }
-                    val lowPercent = remember(recent10) {
-                        if (totalNumbers == 0) 0
-                        else recent10.sumOf { d -> d.numbers.count { it in 1..22 } } * 100 / totalNumbers
+                    val lowCount = remember(recent10) {
+                        recent10.sumOf { d -> d.numbers.count { it in 1..22 } }
                     }
+                    val oddPercent = if (totalNumbers == 0) 0 else oddCount * 100 / totalNumbers
+                    val lowPercent = if (totalNumbers == 0) 0 else lowCount * 100 / totalNumbers
 
                     // 구간별 출현 분포 (전체 회차 기준) — 색상은 LottoBall의 구간별 색과 맞춰서
                     // 앱 전체에서 "이 색 = 이 구간"이라는 의미가 통일되게 했다.
@@ -182,16 +183,32 @@ fun TrendScreen() {
                                 leftLabel = "홀 $oddPercent%",
                                 rightLabel = "짝 ${100 - oddPercent}%",
                                 percent = oddPercent,
-                                barColor = Color(0xFFEF4444) // 홀짝 = 빨강
+                                barColor = Color(0xFFEF4444), // 홀짝 = 빨강
+                                subLabel = "홀 ${oddCount}개 · 짝 ${totalNumbers - oddCount}개"
                             )
                             RatioBar(
                                 modifier = Modifier.weight(1f),
                                 leftLabel = "저 $lowPercent%",
                                 rightLabel = "고 ${100 - lowPercent}%",
                                 percent = lowPercent,
-                                barColor = Color(0xFF0EA5E9) // 고저 = 파랑
+                                barColor = Color(0xFF0EA5E9), // 고저 = 파랑
+                                subLabel = "저 ${lowCount}개 · 고 ${totalNumbers - lowCount}개"
                             )
                         }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Text(
+                                text = "회차별 상세 보기 ›",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .clickable { showOddEvenDetailDialog = true }
+                                    .padding(horizontal = 6.dp, vertical = 8.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -241,6 +258,13 @@ fun TrendScreen() {
             onDismiss = { showSectionDetailDialog = false }
         )
     }
+
+    if (showOddEvenDetailDialog && allDraws != null) {
+        OddEvenDetailDialog(
+            recentDraws = allDraws!!.sortedByDescending { it.drawNo }.take(10),
+            onDismiss = { showOddEvenDetailDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -266,6 +290,69 @@ private fun TrendCard(
             content()
         }
     }
+}
+
+@Composable
+private fun OddEvenDetailDialog(recentDraws: List<HistoricalDraw>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("최근 10회 홀짝 · 고저 상세", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "회차별로 직접 세어보실 수 있게 번호를 그대로 나열했어요.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                recentDraws.sortedByDescending { it.drawNo }.forEach { draw ->
+                    val sorted = draw.numbers.sorted()
+                    val drawOdd = sorted.count { it % 2 != 0 }
+                    val drawLow = sorted.count { it in 1..22 }
+
+                    Text(
+                        text = "${draw.drawNo}회" + if (draw.date.isNotBlank()) " · ${draw.date}" else "",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF334155),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                        sorted.forEach { number ->
+                            val isOdd = number % 2 != 0
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .background(
+                                        if (isOdd) Color(0xFFEF4444) else Color(0xFF0EA5E9),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("$number", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                    Text(
+                        text = "홀 ${drawOdd}개 · 짝 ${6 - drawOdd}개   저 ${drawLow}개 · 고 ${6 - drawLow}개",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기", color = Color(0xFF7C3AED)) }
+        }
+    )
 }
 
 @Composable
@@ -357,7 +444,8 @@ private fun MiniBallRow(items: List<NumberFrequency>, ballColor: Color) {
 }
 
 @Composable
-private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int, barColor: Color) {
+@Composable
+private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int, barColor: Color, subLabel: String? = null) {
     Column(modifier = modifier) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(leftLabel, fontSize = 11.sp, color = Color(0xFF64748B))
@@ -376,6 +464,10 @@ private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabe
                     .height(6.dp)
                     .background(barColor, RoundedCornerShape(3.dp))
             )
+        }
+        if (subLabel != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(subLabel, fontSize = 10.sp, color = Color(0xFF94A3B8))
         }
     }
 }
