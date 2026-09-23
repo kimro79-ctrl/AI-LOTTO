@@ -2729,10 +2729,10 @@ suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
 }
 
 // 번호 1개 + 전체 회차 동안 나온 횟수
-private data class NumberFrequency(val number: Int, val count: Int)
+data class NumberFrequency(val number: Int, val count: Int)
 
 /** 1~45 각 번호가 과거 전체 회차 동안 몇 번 나왔는지 센다. */
-private fun computeNumberFrequencies(draws: List<HistoricalDraw>): List<NumberFrequency> {
+fun computeNumberFrequencies(draws: List<HistoricalDraw>): List<NumberFrequency> {
     val counts = IntArray(46)
     draws.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
     return (1..45).map { NumberFrequency(it, counts[it]) }
