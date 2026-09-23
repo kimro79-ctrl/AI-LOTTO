@@ -444,7 +444,6 @@ private fun MiniBallRow(items: List<NumberFrequency>, ballColor: Color) {
 }
 
 @Composable
-@Composable
 private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int, barColor: Color, subLabel: String? = null) {
     Column(modifier = modifier) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
