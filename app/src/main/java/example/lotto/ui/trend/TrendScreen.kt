@@ -182,7 +182,7 @@ fun TrendScreen() {
                                 leftLabel = "홀 $oddPercent%",
                                 rightLabel = "짝 ${100 - oddPercent}%",
                                 percent = oddPercent,
-                                barColor = Color(0xFF7C3AED) // 홀짝 = 보라
+                                barColor = Color(0xFFEF4444) // 홀짝 = 빨강
                             )
                             RatioBar(
                                 modifier = Modifier.weight(1f),
@@ -197,8 +197,7 @@ fun TrendScreen() {
 
                     TrendCard(
                         emoji = "📊",
-                        title = "구간별 출현 분포 (전체 회차)",
-                        onClick = { showSectionDetailDialog = true }
+                        title = "구간별 출현 분포 (전체 회차)"
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             sectionCounts.forEachIndexed { index, count ->
@@ -217,7 +216,10 @@ fun TrendScreen() {
                                 text = "번호별 상세 보기 ›",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF7C3AED)
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier
+                                    .clickable { showSectionDetailDialog = true }
+                                    .padding(4.dp)
                             )
                         }
                     }
