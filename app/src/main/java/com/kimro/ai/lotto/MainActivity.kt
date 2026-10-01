@@ -1,8 +1,12 @@
 package com.kimro.ai.lotto
 
+import android.Manifest
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kimro.ai.lotto.notifications.FridayAlarmReceiver
+import com.kimro.ai.lotto.notifications.NotificationScheduler
 import com.kimro.ai.lotto.ui.analysis.AnalysisScreen
 import com.kimro.ai.lotto.ui.analysis.AnalysisViewModel
 import com.kimro.ai.lotto.ui.fortune.FortuneScreen
@@ -55,15 +61,28 @@ class MainActivity : ComponentActivity() {
     private val analysisViewModel: AnalysisViewModel by viewModels()
     private val historyViewModel: HistoryViewModel by viewModels()
 
+    // setContent 바깥(액티비티 레벨)에 둬서, onNewIntent에서도 같은 상태를 바로 바꿀 수 있게 했다.
+    // (onCreate 한 번만 타는 지역 변수로 두면, 알림 탭으로 앱이 이미 떠있는 상태에서 다시 열릴 때
+    // onNewIntent만 호출되고 onCreate는 다시 안 타서 화면 전환이 반영이 안 된다.)
+    private var currentScreen by mutableStateOf<Screen>(Screen.Analysis)
+
+    // Android 13(API 33) 이상에서 알림 표시 권한을 요청하기 위한 런처.
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* 거부해도 앱 기능 자체는 그대로 쓸 수 있어서 별도 처리 없음 */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        requestNotificationPermissionIfNeeded()
+        NotificationScheduler.scheduleNextFriday(this)
+        applyDeepLinkIfPresent(intent)
+
         setContent {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                var currentScreen by remember { mutableStateOf<Screen>(Screen.Analysis) }
-
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
@@ -131,6 +150,28 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    // 앱이 이미 실행 중인 상태(백그라운드 등)에서 알림을 탭하면 onCreate가 아니라 이게 호출된다.
+    // (매니페스트에 launchMode="singleTop"을 줘서, 기존 액티비티를 재사용하며 이 콜백을 받게 했다.)
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        applyDeepLinkIfPresent(intent)
+    }
+
+    /** 알림의 PendingIntent에 담아 보낸 "분석 탭 열어줘" 신호를 확인해서 화면을 전환한다. */
+    private fun applyDeepLinkIfPresent(intent: Intent?) {
+        val targetScreen = intent?.getStringExtra(FridayAlarmReceiver.EXTRA_OPEN_SCREEN)
+        if (targetScreen == FridayAlarmReceiver.SCREEN_ANALYSIS) {
+            currentScreen = Screen.Analysis
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
