@@ -42,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +69,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 // 필터 옵션. "저장 시 type 문자열"을 하나 이상 매핑해서 여러 타입을 하나로 묶을 수 있게 했다.
 // (예: 타로 화면은 "TAROT", 예전 코드는 "FORTUNE"으로 저장한 이력이 섞여있어도 "운세"로 함께 묶임)
@@ -144,6 +147,63 @@ private fun computeHistoryBacktest(userNumbers: List<Int>, draws: List<Historica
     return HistoryBacktestResult(rankCounts, matchedDrawsByRank)
 }
 
+/**
+ * 저장 시각 기준으로 "이 번호로 실제 구매 가능했던 가장 가까운 회차"를 계산한다.
+ * 1회 추첨(2002-12-07, 토) 이후 매주 1회씩 빠짐없이 진행되므로 주 단위 계산이 가능하다.
+ * 구매 마감은 추첨일 20:00으로 보고, 마감 이후에 저장된 번호는 다음 회차로 본다.
+ * 저장 시각 문자열을 해석하지 못하면 0(회차 미상)을 돌려준다.
+ */
+private fun estimateTargetRound(savedAt: String): Int {
+    val saved = runCatching {
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).parse(savedAt)
+    }.getOrNull() ?: return 0
+
+    val kst = TimeZone.getTimeZone("Asia/Seoul")
+    val firstDeadlineMillis = Calendar.getInstance(kst).apply {
+        clear()
+        set(2002, Calendar.DECEMBER, 7, 20, 0, 0)
+    }.timeInMillis
+
+    val diff = saved.time - firstDeadlineMillis
+    if (diff < 0) return 1
+    val weekMillis = 7L * 24 * 60 * 60 * 1000
+    return (diff / weekMillis).toInt() + 2
+}
+
+/** 저장된 조합 한 개의 당첨 확인 결과. rank 0은 낙첨, 1~5는 등수. */
+private sealed class DrawStatus {
+    data class Pending(val round: Int) : DrawStatus()
+    data class Done(val round: Int, val rank: Int, val matched: Set<Int>) : DrawStatus()
+}
+
+private fun resolveDrawStatus(
+    entity: LottoEntity,
+    numberList: List<Int>,
+    drawsByNo: Map<Int, HistoricalDraw>?
+): DrawStatus? {
+    if (drawsByNo == null || numberList.size != 6) return null
+
+    // QR 등으로 회차가 확정된 항목은 그 값을, 아니면 저장 시각으로 추정한 회차를 쓴다.
+    val targetRound = if (entity.round > 0) entity.round else estimateTargetRound(entity.date)
+    if (targetRound <= 0) return null
+
+    val draw = drawsByNo[targetRound] ?: return DrawStatus.Pending(targetRound)
+
+    val matchedMain = draw.numbers.filter { it in numberList }
+    val bonusMatched = draw.bonusNo in numberList
+    val rank = when {
+        matchedMain.size == 6 -> 1
+        matchedMain.size == 5 && bonusMatched -> 2
+        matchedMain.size == 5 -> 3
+        matchedMain.size == 4 -> 4
+        matchedMain.size == 3 -> 5
+        else -> 0
+    }
+    // 2등일 때만 보너스 번호도 "맞은 번호"로 강조한다.
+    val matched = if (rank == 2) (matchedMain + draw.bonusNo).toSet() else matchedMain.toSet()
+    return DrawStatus.Done(targetRound, rank, matched)
+}
+
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
@@ -162,6 +222,21 @@ fun HistoryScreen(
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showSelectedDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // 당첨 확인용 회차 데이터는 카드마다 받지 않고, 화면에서 한 번만 불러와 모든 카드가 같이 쓴다.
+    // 불러오기에 실패하면 null로 두고, 카드에는 당첨 상태를 표시하지 않는다.
+    var drawsByNo by remember { mutableStateOf<Map<Int, HistoricalDraw>?>(null) }
+    LaunchedEffect(historyList.isEmpty()) {
+        if (historyList.isNotEmpty() && drawsByNo == null) {
+            drawsByNo = try {
+                fetchHistoricalDraws().associateBy { it.drawNo.toInt() }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     // 필터링 + 정렬된 최종 리스트 계산
     val displayedList = remember(historyList, selectedFilter, selectedSort) {
@@ -398,6 +473,7 @@ fun HistoryScreen(
                         HistoryItem(
                             entity = item,
                             onDeleteClick = { viewModel.deleteHistory(item.id) },
+                            drawsByNo = drawsByNo,
                             isSelectionMode = isSelectionMode,
                             isSelected = item.id in selectedIds,
                             onToggleSelect = {
@@ -611,6 +687,7 @@ private fun shareLottoNumbers(context: android.content.Context, shareText: Strin
 fun HistoryItem(
     entity: LottoEntity,
     onDeleteClick: () -> Unit,
+    drawsByNo: Map<Int, HistoricalDraw>? = null,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {}
@@ -619,6 +696,12 @@ fun HistoryItem(
     val typeLabel = resolveTypeLabel(entity)
 
     val numberList = entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+
+    // 이 조합이 해당 회차에서 몇 등이었는지 (데이터가 없거나 회차를 모르면 null)
+    val drawStatus = remember(entity.id, entity.numbers, entity.round, entity.date, drawsByNo) {
+        resolveDrawStatus(entity, numberList, drawsByNo)
+    }
+    val doneStatus = drawStatus as? DrawStatus.Done
 
     // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
     val hasRound = entity.round > 0
@@ -770,7 +853,51 @@ fun HistoryItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 numberList.forEach { num ->
-                    HistoryBallItem(number = num)
+                    // 일치한 번호가 하나라도 있으면, 맞지 않은 번호는 흐리게 해서 맞은 번호가 눈에 띄게 한다.
+                    HistoryBallItem(
+                        number = num,
+                        dimmed = doneStatus != null &&
+                            doneStatus.matched.isNotEmpty() &&
+                            num !in doneStatus.matched
+                    )
+                }
+            }
+
+            if (drawStatus != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val (statusText, statusColor, statusBg) = when (drawStatus) {
+                    is DrawStatus.Pending -> Triple(
+                        "${drawStatus.round}회 추첨 결과 대기 중",
+                        Color(0xFF64748B),
+                        Color(0xFFF1F5F9)
+                    )
+                    is DrawStatus.Done -> if (drawStatus.rank in 1..5) {
+                        Triple(
+                            "🎉 ${drawStatus.round}회 ${drawStatus.rank}등 당첨!",
+                            Color(0xFF047857),
+                            Color(0xFFD1FAE5)
+                        )
+                    } else {
+                        Triple(
+                            "${drawStatus.round}회 낙첨 (${drawStatus.matched.size}개 일치)",
+                            Color(0xFF94A3B8),
+                            Color(0xFFF8FAFC)
+                        )
+                    }
+                }
+                Surface(
+                    color = statusBg,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = statusText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
             }
 
@@ -1013,7 +1140,7 @@ fun HistoryItem(
 }
 
 @Composable
-fun HistoryBallItem(number: Int) {
+fun HistoryBallItem(number: Int, dimmed: Boolean = false) {
     val ballColor = when (number) {
         in 1..10 -> Color(0xFFFBC02D)
         in 11..20 -> Color(0xFF1E88E5)
@@ -1026,6 +1153,7 @@ fun HistoryBallItem(number: Int) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(36.dp)
+            .alpha(if (dimmed) 0.3f else 1f)
             .background(color = ballColor, shape = CircleShape)
     ) {
         Text(
