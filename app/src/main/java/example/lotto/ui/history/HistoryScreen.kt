@@ -853,12 +853,10 @@ fun HistoryItem(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 numberList.forEach { num ->
-                    // 일치한 번호가 하나라도 있으면, 맞지 않은 번호는 흐리게 해서 맞은 번호가 눈에 띄게 한다.
+                    // 추첨 결과가 반영된 카드는 맞지 않은 번호를 흐리게 한다. (0개 일치면 전부 흐려진다)
                     HistoryBallItem(
                         number = num,
-                        dimmed = doneStatus != null &&
-                            doneStatus.matched.isNotEmpty() &&
-                            num !in doneStatus.matched
+                        dimmed = doneStatus != null && num !in doneStatus.matched
                     )
                 }
             }
