@@ -182,6 +182,9 @@ private fun isDrawPublished(round: Int): Boolean {
     return System.currentTimeMillis() >= drawMillis
 }
 
+private fun parseNumbers(entity: LottoEntity): List<Int> =
+    entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+
 /** 저장된 조합 한 개의 당첨 확인 결과. rank 0은 낙첨, 1~5는 등수. */
 private sealed class DrawStatus {
     data class Pending(val round: Int) : DrawStatus()
@@ -216,6 +219,30 @@ private fun resolveDrawStatus(
     return DrawStatus.Done(targetRound, rank, matched)
 }
 
+private fun drawStatusRound(s: DrawStatus): Int = when (s) {
+    is DrawStatus.Pending -> s.round
+    is DrawStatus.Done -> s.round
+}
+
+/** 날짜 묶음 전체의 당첨 요약. 묶음 안의 회차가 모두 같을 때만 만들어 헤더에 한 번만 보여준다. */
+private data class GroupDrawSummary(val text: String, val hasWin: Boolean)
+
+private fun summarizeGroup(statuses: List<DrawStatus?>): GroupDrawSummary? {
+    val list = statuses.filterNotNull()
+    if (list.isEmpty()) return null
+    val round = drawStatusRound(list.first())
+    if (list.any { drawStatusRound(it) != round }) return null
+    val dones = list.filterIsInstance<DrawStatus.Done>()
+    if (dones.isEmpty()) return GroupDrawSummary("${round}회 추첨 결과 대기 중", false)
+    val wins = dones.filter { it.rank in 1..5 }
+    return if (wins.isNotEmpty()) {
+        val best = wins.minOf { it.rank }
+        GroupDrawSummary("🎉 ${round}회 · ${wins.size}개 당첨 (최고 ${best}등)", true)
+    } else {
+        GroupDrawSummary("${round}회 · ${dones.size}개 모두 낙첨", false)
+    }
+}
+
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
@@ -227,6 +254,8 @@ fun HistoryScreen(
     var dateGroupPendingDelete by remember { mutableStateOf<String?>(null) }
     var selectedFilter by remember { mutableStateOf(HistoryFilter.ALL) }
     var selectedSort by remember { mutableStateOf(HistorySort.LATEST) }
+    // "과거 당첨 이력"을 보고 있는 날짜 그룹 키 (null이면 팝업 닫힘)
+    var backtestGroupKey by remember { mutableStateOf<String?>(null) }
 
     // 여러 개를 체크박스로 골라서 한 번에 공유하기 위한 "선택 모드" 상태.
     // 선택 모드를 끄면 선택 내역도 함께 초기화한다.
@@ -485,10 +514,21 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 groupedByDate.forEach { (dateKey, itemsForDate) ->
+                    // 같은 날 저장한 조합은 대부분 같은 회차라서, 회차/당첨 요약은 헤더에 한 번만 보여준다.
+                    val groupSummary = summarizeGroup(
+                        itemsForDate.map { resolveDrawStatus(it, parseNumbers(it), drawsByNo) }
+                    )
                     item(key = "header_$dateKey") {
                         DateGroupHeader(
                             dateKey = dateKey,
                             count = itemsForDate.size,
+                            summaryText = groupSummary?.text,
+                            summaryHighlight = groupSummary?.hasWin == true,
+                            showActions = !isSelectionMode,
+                            onShareGroupClick = {
+                                shareLottoNumbers(context, buildMultiShareText(itemsForDate))
+                            },
+                            onBacktestClick = { backtestGroupKey = dateKey },
                             onDeleteGroupClick = { dateGroupPendingDelete = dateKey }
                         )
                     }
@@ -500,6 +540,7 @@ fun HistoryScreen(
                             entity = item,
                             onDeleteClick = { viewModel.deleteHistory(item.id) },
                             drawsByNo = drawsByNo,
+                            showRoundInStatus = groupSummary == null,
                             isSelectionMode = isSelectionMode,
                             isSelected = item.id in selectedIds,
                             onToggleSelect = {
@@ -564,6 +605,21 @@ fun HistoryScreen(
         )
     }
 
+    // 날짜 묶음 단위 "과거 당첨 이력" 팝업
+    val backtestKey = backtestGroupKey
+    if (backtestKey != null) {
+        val groupEntities = groupedByDate.firstOrNull { it.first == backtestKey }?.second ?: emptyList()
+        if (groupEntities.isEmpty()) {
+            backtestGroupKey = null
+        } else {
+            DateGroupBacktestDialog(
+                dateLabel = formatDateGroupLabel(backtestKey),
+                entities = groupEntities,
+                onDismiss = { backtestGroupKey = null }
+            )
+        }
+    }
+
     // 날짜 그룹 삭제 확인 팝업
     val groupKeyToDelete = dateGroupPendingDelete
     if (groupKeyToDelete != null) {
@@ -592,54 +648,114 @@ fun HistoryScreen(
     }
 }
 
-/** 날짜 그룹 상단에 붙는 헤더. "오늘 · 8월 19일 (2)" 형태로 보여주고, 옆에 이 날짜만 삭제하는 버튼이 있다. */
+/**
+ * 날짜 그룹 상단에 붙는 헤더. "오늘 · 8월 19일 5개" 아래에 그 묶음의 회차/당첨 요약을 한 줄로 보여주고,
+ * 오른쪽에 이 날짜 전체 공유 / 과거 당첨 이력 / 삭제 버튼을 둔다.
+ */
 @Composable
-fun DateGroupHeader(dateKey: String, count: Int, onDeleteGroupClick: () -> Unit) {
-    Row(
+fun DateGroupHeader(
+    dateKey: String,
+    count: Int,
+    summaryText: String?,
+    summaryHighlight: Boolean,
+    showActions: Boolean,
+    onShareGroupClick: () -> Unit,
+    onBacktestClick: () -> Unit,
+    onDeleteGroupClick: () -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 6.dp, bottom = 2.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 다른 화면(분석/운세)의 원형 그라데이션 아이콘 배지와 톤을 맞췄다.
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(
-                        androidx.compose.ui.graphics.Brush.horizontalGradient(
-                            listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "🗓", fontSize = 11.sp)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = formatDateGroupLabel(dateKey),
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = Color(0xFF334155)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "${count}개",
-                fontSize = 12.sp,
-                color = Color(0xFF94A3B8)
-            )
-        }
-        IconButton(
-            onClick = onDeleteGroupClick,
-            modifier = Modifier.size(26.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = "이 날짜 전체 삭제",
-                tint = Color(0xFFEF4444).copy(alpha = 0.65f),
-                modifier = Modifier.size(16.dp)
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 다른 화면(분석/운세)의 원형 그라데이션 아이콘 배지와 톤을 맞췄다.
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(Color(0xFF0EA5E9), Color(0xFF7C3AED))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🗓", fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatDateGroupLabel(dateKey),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF334155),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "${count}개",
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showActions) {
+                    Surface(
+                        color = Color(0xFFF3E8FF),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.clickable { onBacktestClick() }
+                    ) {
+                        Text(
+                            text = "📜 이력",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF7C3AED),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onShareGroupClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "이 날짜 전체 공유",
+                            tint = Color(0xFF0D9488),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onDeleteGroupClick,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "이 날짜 전체 삭제",
+                        tint = Color(0xFFEF4444).copy(alpha = 0.65f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+        if (summaryText != null) {
+            Text(
+                text = summaryText,
+                fontSize = 12.sp,
+                fontWeight = if (summaryHighlight) FontWeight.Bold else FontWeight.Normal,
+                color = if (summaryHighlight) Color(0xFF047857) else Color(0xFF64748B),
+                modifier = Modifier.padding(start = 30.dp, top = 2.dp)
             )
         }
     }
@@ -714,6 +830,7 @@ fun HistoryItem(
     entity: LottoEntity,
     onDeleteClick: () -> Unit,
     drawsByNo: Map<Int, HistoricalDraw>? = null,
+    showRoundInStatus: Boolean = true,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {}
@@ -731,35 +848,6 @@ fun HistoryItem(
 
     // QR로 스캔해서 실제 회차가 확인된 경우에만 회차 뱃지를 보여준다 (round=0은 회차 미상)
     val hasRound = entity.round > 0
-
-    // "과거 당첨 이력 보기" 팝업 상태 - 항목마다 독립적으로 관리한다.
-    var showBacktestDialog by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-    var isLoadingBacktest by remember { mutableStateOf(false) }
-    var backtestError by remember { mutableStateOf<String?>(null) }
-    var backtestResult by remember { mutableStateOf<HistoryBacktestResult?>(null) }
-    var backtestTotalDraws by remember { mutableStateOf(0) }
-    // 어떤 등수 행이 펼쳐져 있는지 (한 번에 하나만 펼치도록 인덱스 하나만 저장)
-    var expandedRankIndex by remember { mutableStateOf<Int?>(null) }
-    // 펼친 등수 안에서 "전체 보기"를 눌렀는지 여부. 등수를 바꿔 펼칠 때마다 초기화된다.
-    var showAllInExpandedRank by remember { mutableStateOf(false) }
-
-    fun runBacktest() {
-        if (numberList.size != 6) return
-        isLoadingBacktest = true
-        backtestError = null
-        coroutineScope.launch {
-            try {
-                val draws = fetchHistoricalDraws()
-                backtestTotalDraws = draws.size
-                backtestResult = computeHistoryBacktest(numberList, draws)
-            } catch (e: Exception) {
-                backtestError = "데이터를 불러오지 못했습니다. 네트워크 상태를 확인 후 다시 시도해주세요."
-            } finally {
-                isLoadingBacktest = false
-            }
-        }
-    }
 
     Card(
         modifier = Modifier
@@ -887,23 +975,30 @@ fun HistoryItem(
                 }
             }
 
-            if (drawStatus != null) {
+            // 같은 회차로 묶인 날짜 그룹에서는 회차/대기 상태를 헤더가 보여주므로 카드에서는 생략한다.
+            val statusToShow = if (!showRoundInStatus && drawStatus is DrawStatus.Pending) null else drawStatus
+            if (statusToShow != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                val (statusText, statusColor, statusBg) = when (drawStatus) {
+                val roundPrefix = if (showRoundInStatus) {
+                    "${drawStatusRound(statusToShow)}회 "
+                } else {
+                    ""
+                }
+                val (statusText, statusColor, statusBg) = when (statusToShow) {
                     is DrawStatus.Pending -> Triple(
-                        "${drawStatus.round}회 추첨 결과 대기 중",
+                        "${statusToShow.round}회 추첨 결과 대기 중",
                         Color(0xFF64748B),
                         Color(0xFFF1F5F9)
                     )
-                    is DrawStatus.Done -> if (drawStatus.rank in 1..5) {
+                    is DrawStatus.Done -> if (statusToShow.rank in 1..5) {
                         Triple(
-                            "🎉 ${drawStatus.round}회 ${drawStatus.rank}등 당첨!",
+                            "🎉 ${roundPrefix}${statusToShow.rank}등 당첨!",
                             Color(0xFF047857),
                             Color(0xFFD1FAE5)
                         )
                     } else {
                         Triple(
-                            "${drawStatus.round}회 낙첨 (${drawStatus.matched.size}개 일치)",
+                            "${roundPrefix}낙첨 (${statusToShow.matched.size}개 일치)",
                             Color(0xFF94A3B8),
                             Color(0xFFF8FAFC)
                         )
@@ -925,237 +1020,346 @@ fun HistoryItem(
                 }
             }
 
-            if (numberList.size == 6 && !isSelectionMode) {
-                Spacer(modifier = Modifier.height(6.dp))
-                HorizontalDivider(color = Color(0xFFF1F5F9))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            showBacktestDialog = true
-                            if (backtestResult == null && !isLoadingBacktest) runBacktest()
-                        }
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "📜 과거 당첨 이력 보기",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF7C3AED)
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text("›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C3AED))
-                }
-            }
         }
     }
+}
 
-    if (showBacktestDialog) {
-        Dialog(onDismissRequest = { showBacktestDialog = false }) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White
-            ) {
+private val HISTORY_BACKTEST_RANK_SHORT = listOf("1등", "2등", "3등", "4등", "5등")
+
+/** 한 조합의 등수별 과거 당첨 횟수 + 등수를 눌러 펼쳐보는 상세 화면. */
+@Composable
+private fun HistoryBacktestDetail(
+    numberList: List<Int>,
+    result: HistoryBacktestResult,
+    totalDraws: Int
+) {
+    var expandedRankIndex by remember { mutableStateOf<Int?>(null) }
+    var showAllInExpandedRank by remember { mutableStateOf(false) }
+    Column {
+        Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "총 ${"%,d".format(totalDraws)}개 회차 데이터 기준",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF7C3AED),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HISTORY_BACKTEST_RANK_LABELS.forEachIndexed { index, label ->
+                val count = result.rankCounts[index]
+                val isExpanded = expandedRankIndex == index
                 Column(
                     modifier = Modifier
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState())
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
+                        .then(
+                            if (count > 0) Modifier.clickable {
+                                expandedRankIndex = if (isExpanded) null else index
+                                showAllInExpandedRank = false
+                            } else Modifier
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "과거 당첨 이력",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
-                        )
-                        IconButton(onClick = { showBacktestDialog = false }, modifier = Modifier.size(26.dp)) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        numberList.forEach { number -> HistoryBallItem(number = number) }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "이 번호로 1회부터 지금까지 실제로 있었던 모든 회차와 비교하면?",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B),
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    when {
-                        isLoadingBacktest -> {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("과거 회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
-                            }
-                        }
-                        backtestError != null -> {
-                            Text(backtestError ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = { runBacktest() },
-                                modifier = Modifier.fillMaxWidth().height(42.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
-                            ) {
-                                Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                        backtestResult != null -> {
-                            val result = backtestResult!!
-                            Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (count > 0) "${count}회" else "0회",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
+                            )
+                            if (count > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "총 ${"%,d".format(backtestTotalDraws)}개 회차 데이터 기준",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF7C3AED),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    text = if (isExpanded) "▲" else "▼",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF94A3B8)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+                    }
 
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                HISTORY_BACKTEST_RANK_LABELS.forEachIndexed { index, label ->
-                                    val count = result.rankCounts[index]
-                                    val isExpanded = expandedRankIndex == index
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = Color(0xFFE2E8F0))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val fullList = result.matchedDrawsByRank[index]
+                        val visibleList = if (showAllInExpandedRank) fullList else fullList.take(5)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            visibleList.forEach { draw ->
+                                Column {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "${draw.drawNo}회",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF475569)
+                                        )
+                                        if (draw.date.isNotBlank()) {
+                                            Text(
+                                                text = draw.date,
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF94A3B8)
+                                            )
+                                        }
+                                    }
+                                    // 어떤 번호가 실제로 맞았는지도 같이 보여준다.
+                                    val matchedNumbers = draw.numbers.filter { it in numberList }.sorted()
+                                    if (matchedNumbers.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "일치 번호: ${matchedNumbers.joinToString(", ")}",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF7C3AED)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (fullList.size > 5) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (showAllInExpandedRank) "최근 5회만 보기 ▲" else "전체 ${fullList.size}회 보기 ›",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showAllInExpandedRank = !showAllInExpandedRank }
+                                    .padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                Text("${result.rankCounts[5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "탭하면 최근 회차부터 볼 수 있어요",
+            fontSize = 10.sp,
+            color = Color(0xFFB18CF5)
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
+                    "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있습니다. " +
+                    "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
+            fontSize = 10.sp,
+            color = Color(0xFF94A3B8),
+            lineHeight = 14.sp
+        )
+
+    }
+}
+
+/** 날짜 묶음 전체를 한 번에 보는 "과거 당첨 이력" 팝업. 조합을 누르면 그 조합의 상세 이력으로 넘어간다. */
+@Composable
+private fun DateGroupBacktestDialog(
+    dateLabel: String,
+    entities: List<LottoEntity>,
+    onDismiss: () -> Unit
+) {
+    var isLoading by remember { mutableStateOf(true) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+    var totalDraws by remember { mutableStateOf(0) }
+    var results by remember { mutableStateOf<Map<Long, HistoryBacktestResult>>(emptyMap()) }
+    var selectedId by remember { mutableStateOf<Long?>(null) }
+    var reloadKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(reloadKey) {
+        isLoading = true
+        errorText = null
+        try {
+            val draws = fetchHistoricalDraws()
+            totalDraws = draws.size
+            results = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                entities.mapNotNull { e ->
+                    val nums = parseNumbers(e)
+                    if (nums.size == 6) e.id to computeHistoryBacktest(nums, draws) else null
+                }.toMap()
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorText = "데이터를 불러오지 못했습니다. 네트워크 상태를 확인 후 다시 시도해주세요."
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val selectedEntity = entities.firstOrNull { it.id == selectedId }
+    val selectedResult = selectedEntity?.let { results[it.id] }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (selectedEntity != null) {
+                        Text(
+                            text = "‹ 목록으로",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF7C3AED),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedId = null }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                        )
+                    } else {
+                        Column {
+                            Text(
+                                text = "과거 당첨 이력",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
+                            Text(text = dateLabel, fontSize = 12.sp, color = Color(0xFF94A3B8))
+                        }
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(26.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "닫기", tint = Color(0xFF94A3B8))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF7C3AED))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("과거 회차 데이터 불러오는 중...", fontSize = 12.sp, color = Color(0xFF64748B))
+                        }
+                    }
+                    errorText != null -> {
+                        Text(errorText ?: "", fontSize = 12.sp, color = Color(0xFFEF4444), lineHeight = 16.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { reloadKey++ },
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                        ) {
+                            Text("다시 시도", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                    selectedEntity != null && selectedResult != null -> {
+                        val nums = parseNumbers(selectedEntity)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            nums.forEach { number -> HistoryBallItem(number = number) }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "이 번호로 1회부터 지금까지 실제로 있었던 모든 회차와 비교하면?",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            lineHeight = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HistoryBacktestDetail(numberList = nums, result = selectedResult, totalDraws = totalDraws)
+                    }
+                    else -> {
+                        Text(
+                            text = "이 날 저장한 ${entities.size}개 조합을 1회부터 지금까지의 모든 회차와 비교했어요. 조합을 누르면 자세히 볼 수 있어요.",
+                            fontSize = 12.sp,
+                            color = Color(0xFF64748B),
+                            lineHeight = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "총 ${"%,d".format(totalDraws)}개 회차 데이터 기준",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF7C3AED)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            entities.forEach { entity ->
+                                val res = results[entity.id]
+                                if (res != null) {
+                                    val summary = HISTORY_BACKTEST_RANK_SHORT
+                                        .mapIndexedNotNull { i, label ->
+                                            val c = res.rankCounts[i]
+                                            if (c > 0) "$label ${c}회" else null
+                                        }
+                                        .joinToString(" · ")
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(Color(0xFFF8FAFC), RoundedCornerShape(10.dp))
-                                            .then(
-                                                if (count > 0) Modifier.clickable {
-                                                    expandedRankIndex = if (isExpanded) null else index
-                                                    showAllInExpandedRank = false
-                                                } else Modifier
-                                            )
+                                            .clickable { selectedId = entity.id }
                                             .padding(horizontal = 12.dp, vertical = 10.dp)
                                     ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            parseNumbers(entity).forEach { number -> HistoryBallItem(number = number) }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = if (count > 0) "${count}회" else "0회",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (count > 0) Color(0xFF10B981) else Color(0xFF94A3B8)
-                                                )
-                                                if (count > 0) {
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = if (isExpanded) "▲" else "▼",
-                                                        fontSize = 10.sp,
-                                                        color = Color(0xFF94A3B8)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        if (isExpanded) {
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            HorizontalDivider(color = Color(0xFFE2E8F0))
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            val fullList = result.matchedDrawsByRank[index]
-                                            val visibleList = if (showAllInExpandedRank) fullList else fullList.take(5)
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                visibleList.forEach { draw ->
-                                                    Column {
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween
-                                                        ) {
-                                                            Text(
-                                                                text = "${draw.drawNo}회",
-                                                                fontSize = 11.sp,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                color = Color(0xFF475569)
-                                                            )
-                                                            if (draw.date.isNotBlank()) {
-                                                                Text(
-                                                                    text = draw.date,
-                                                                    fontSize = 11.sp,
-                                                                    color = Color(0xFF94A3B8)
-                                                                )
-                                                            }
-                                                        }
-                                                        // 어떤 번호가 실제로 맞았는지도 같이 보여준다.
-                                                        val matchedNumbers = draw.numbers.filter { it in numberList }.sorted()
-                                                        if (matchedNumbers.isNotEmpty()) {
-                                                            Spacer(modifier = Modifier.height(2.dp))
-                                                            Text(
-                                                                text = "일치 번호: ${matchedNumbers.joinToString(", ")}",
-                                                                fontSize = 10.sp,
-                                                                color = Color(0xFF7C3AED)
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            if (fullList.size > 5) {
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = if (showAllInExpandedRank) "최근 5회만 보기 ▲" else "전체 ${fullList.size}회 보기 ›",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF7C3AED),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable { showAllInExpandedRank = !showAllInExpandedRank }
-                                                        .padding(vertical = 4.dp)
-                                                )
-                                            }
+                                            Text(
+                                                text = if (summary.isEmpty()) "5등 이상 당첨 이력 없음" else summary,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (summary.isEmpty()) FontWeight.Normal else FontWeight.Bold,
+                                                color = if (summary.isEmpty()) Color(0xFF94A3B8) else Color(0xFF10B981),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text("›", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
                                         }
                                     }
                                 }
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("낙첨", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                    Text("${result.rankCounts[5]}회", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                }
                             }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "탭하면 최근 회차부터 볼 수 있어요",
-                                fontSize = 10.sp,
-                                color = Color(0xFFB18CF5)
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "📜 이 데이터는 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto)을 사용합니다. " +
-                                        "동행복권 공식 데이터가 아니라 최신 회차 반영이 늦을 수 있습니다. " +
-                                        "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
-                                fontSize = 10.sp,
-                                color = Color(0xFF94A3B8),
-                                lineHeight = 14.sp
-                            )
                         }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "📜 커뮤니티가 관리하는 공개 회차 기록(GitHub: smok95/lotto) 기준입니다. " +
+                                    "과거에 이랬다는 사실일 뿐, 미래 당첨을 예측하거나 보장하지 않습니다 — 매 회차는 완전히 독립적인 무작위 추첨입니다.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            lineHeight = 14.sp
+                        )
                     }
                 }
             }
