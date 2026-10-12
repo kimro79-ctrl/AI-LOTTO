@@ -1,6 +1,7 @@
 // File Path: app/src/main/java/com/kimro/ai/lotto/ui/trend/TrendScreen.kt
 package com.kimro.ai.lotto.ui.trend
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,8 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kimro.ai.lotto.ui.analysis.HistoricalDraw
@@ -22,12 +25,16 @@ import com.kimro.ai.lotto.ui.analysis.NumberFrequency
 import com.kimro.ai.lotto.ui.analysis.computeNumberFrequencies
 import com.kimro.ai.lotto.ui.analysis.fetchHistoricalDraws
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * "최신경향" 탭. 다빈도/콜드넘버는 기존 HotColdDialog·computeNumberFrequencies를 그대로 재사용하고
- * (TOP5만 미리보기, "더보기"로 기존 팝업의 TOP10 전체를 그대로 연다), 홀짝/고저 추이와 구간별
- * 출현 분포만 이 화면에서 새로 계산한다. 전체 회차 데이터(fetchHistoricalDraws)는 캐시돼 있어
- * 다른 화면(백테스트 등)에서 이미 받아둔 경우 재요청 없이 바로 재사용된다.
+ * "최신경향" 탭.
+ *
+ * 구성: 최신 회차 요약 → 다빈도/콜드 TOP 5(번호당 평균 대비 편차) → 최근 10회 홀짝·고저 →
+ * 구간별 출현 편차(기대값 대비) → 장기 미출현 번호.
+ * 다빈도/콜드 "더보기"는 기존 HotColdDialog를 그대로 재사용하고, 나머지는 전체 회차 데이터
+ * (fetchHistoricalDraws, 캐시됨)에서 이 화면이 직접 계산한다.
  */
 @Composable
 fun TrendScreen() {
@@ -45,6 +52,8 @@ fun TrendScreen() {
         scope.launch {
             try {
                 allDraws = fetchHistoricalDraws()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 errorMessage = "데이터를 불러오지 못했어요. 다시 시도해주세요."
             } finally {
@@ -71,16 +80,16 @@ fun TrendScreen() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "경향 리포트",
+                    text = "최신경향",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF0F172A)
                 )
-                val latestRound = allDraws?.maxOfOrNull { it.drawNo }
-                if (latestRound != null) {
-                    Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(8.dp)) {
+                val headerRound = allDraws?.maxOfOrNull { it.drawNo }
+                if (headerRound != null) {
+                    Surface(color = Color(0xFFF3E8FF), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            text = "${latestRound}회 기준",
+                            text = "${headerRound}회까지 반영",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF7C3AED),
@@ -89,12 +98,7 @@ fun TrendScreen() {
                     }
                 }
             }
-            Text(
-                text = "매 회차는 독립 추첨이에요. 참고용 통계예요.",
-                fontSize = 11.sp,
-                color = Color(0xFF94A3B8),
-                modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
-            )
+            Spacer(modifier = Modifier.height(14.dp))
 
             when {
                 isLoading -> {
@@ -117,9 +121,12 @@ fun TrendScreen() {
                 }
                 allDraws != null -> {
                     val draws = allDraws!!
+                    val latest = remember(draws) { draws.maxByOrNull { it.drawNo } }
                     val frequencies = remember(draws) { computeNumberFrequencies(draws) }
                     val hotTop5 = remember(frequencies) { frequencies.sortedByDescending { it.count }.take(5) }
                     val coldTop5 = remember(frequencies) { frequencies.sortedBy { it.count }.take(5) }
+                    // 번호 1개당 평균 출현 횟수 (전체 출현 횟수 / 45). 다빈도/콜드의 편차 기준.
+                    val avgCount = remember(frequencies) { frequencies.sumOf { it.count } / 45f }
 
                     // 최근 10회 홀짝/고저 비율
                     val recent10 = remember(draws) { draws.sortedByDescending { it.drawNo }.take(10) }
@@ -133,117 +140,197 @@ fun TrendScreen() {
                     val oddPercent = if (totalNumbers == 0) 0 else oddCount * 100 / totalNumbers
                     val lowPercent = if (totalNumbers == 0) 0 else lowCount * 100 / totalNumbers
 
-                    // 구간별 출현 분포 (전체 회차 기준) — 색상은 LottoBall의 구간별 색과 맞춰서
-                    // 앱 전체에서 "이 색 = 이 구간"이라는 의미가 통일되게 했다.
+                    // 구간별 출현 편차 (전체 회차 기준). 구간은 모두 번호 9개라 기대값은 전체의 20%.
                     val sectionLabels = listOf("1-9", "10-18", "19-27", "28-36", "37-45")
                     val sectionRanges = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
-                    val sectionColors = listOf(
-                        Color(0xFFF59E0B), // 1-9 주황
-                        Color(0xFF3B82F6), // 10-18 파랑
-                        Color(0xFFEF4444), // 19-27 빨강
-                        Color(0xFF64748B), // 28-36 회색
-                        Color(0xFF10B981)  // 37-45 초록
-                    )
                     val sectionCounts = remember(draws) {
                         sectionRanges.map { range -> draws.sumOf { d -> d.numbers.count { it in range } } }
                     }
-                    val maxSectionCount = (sectionCounts.maxOrNull() ?: 0).coerceAtLeast(1)
                     val totalSectionNumbers = sectionCounts.sum()
+                    val sectionExpected = totalSectionNumbers / 5f
+                    val sectionDeviations = sectionCounts.map { (it - sectionExpected).roundToInt() }
+                    val maxAbsDeviation = (sectionDeviations.maxOfOrNull { abs(it) } ?: 0).coerceAtLeast(1)
 
-                    TrendCard(emoji = "🔥", title = "전체 회차 다빈도 TOP 5") {
-                        MiniBallRow(items = hotTop5, ballColor = Color(0xFFEF4444))
+                    // 장기 미출현 번호: 각 번호가 마지막으로 나온 회차 (보너스 번호는 제외)
+                    val latestRound = latest?.drawNo ?: 0
+                    val lastSeen = remember(draws) {
+                        val arr = IntArray(46)
+                        draws.sortedBy { it.drawNo }.forEach { d ->
+                            d.numbers.forEach { if (it in 1..45) arr[it] = d.drawNo }
+                        }
+                        arr
+                    }
+                    val longAbsent = remember(lastSeen, latestRound) {
+                        (1..45)
+                            .filter { lastSeen[it] > 0 }
+                            .map { it to (latestRound - lastSeen[it]) }
+                            .sortedByDescending { it.second }
+                            .take(3)
+                    }
+
+                    // 1) 최신 회차 요약
+                    if (latest != null) {
+                        LatestRoundCard(draw = latest)
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // 2) 다빈도 / 콜드 TOP 5
+                    TrendCard(title = "다빈도 · 콜드 TOP 5", dotColor = Color(0xFFEF4444)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            FreqColumn(
+                                modifier = Modifier.weight(1f),
+                                title = "다빈도",
+                                items = hotTop5,
+                                avg = avgCount,
+                                devColor = Color(0xFFEF4444)
+                            )
+                            FreqColumn(
+                                modifier = Modifier.weight(1f),
+                                title = "콜드",
+                                items = coldTop5,
+                                avg = avgCount,
+                                devColor = Color(0xFF3B82F6)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(color = Color(0xFFF1F5F9))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "번호당 평균 ${avgCount.roundToInt()}회 기준 편차",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                            Text(
+                                text = "더보기 (TOP 10) ›",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF7C3AED),
+                                modifier = Modifier
+                                    .clickable { showHotColdDialog = true }
+                                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    TrendCard(emoji = "❄️", title = "콜드넘버 TOP 5") {
-                        MiniBallRow(items = coldTop5, ballColor = Color(0xFF3B82F6))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Text(
-                            text = "더보기 (TOP 10) ›",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF7C3AED),
-                            modifier = Modifier
-                                .clickable { showHotColdDialog = true }
-                                .padding(4.dp)
+                    // 3) 최근 10회 홀짝 · 고저
+                    TrendCard(title = "최근 10회 홀짝 · 고저", dotColor = Color(0xFF64748B)) {
+                        RatioBar(
+                            leftLabel = "홀 $oddPercent%",
+                            rightLabel = "짝 ${100 - oddPercent}%",
+                            percent = oddPercent,
+                            leftColor = Color(0xFFEF4444),
+                            rightColor = Color(0xFF3B82F6),
+                            subLabel = "홀 ${oddCount}개 · 짝 ${totalNumbers - oddCount}개"
                         )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    TrendCard(emoji = "⚖\uFE0F", title = "최근 10회 홀짝 · 고저") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            RatioBar(
-                                modifier = Modifier.weight(1f),
-                                leftLabel = "홀 $oddPercent%",
-                                rightLabel = "짝 ${100 - oddPercent}%",
-                                percent = oddPercent,
-                                barColor = Color(0xFFEF4444), // 홀짝 = 빨강
-                                subLabel = "홀 ${oddCount}개 · 짝 ${totalNumbers - oddCount}개"
-                            )
-                            RatioBar(
-                                modifier = Modifier.weight(1f),
-                                leftLabel = "저 $lowPercent%",
-                                rightLabel = "고 ${100 - lowPercent}%",
-                                percent = lowPercent,
-                                barColor = Color(0xFF0EA5E9), // 고저 = 파랑
-                                subLabel = "저 ${lowCount}개 · 고 ${totalNumbers - lowCount}개"
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        RatioBar(
+                            leftLabel = "저 $lowPercent%",
+                            rightLabel = "고 ${100 - lowPercent}%",
+                            percent = lowPercent,
+                            leftColor = Color(0xFF10B981),
+                            rightColor = Color(0xFFF59E0B),
+                            subLabel = "저 ${lowCount}개 · 고 ${totalNumbers - lowCount}개"
+                        )
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Text(
                                 text = "회차별 상세 보기 ›",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED),
                                 maxLines = 1,
                                 modifier = Modifier
                                     .clickable { showOddEvenDetailDialog = true }
-                                    .padding(horizontal = 6.dp, vertical = 8.dp)
+                                    .padding(horizontal = 4.dp, vertical = 8.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
                     }
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    // 4) 구간별 출현 편차
                     TrendCard(
-                        emoji = "📊",
-                        title = "구간별 출현 분포 (전체 회차)"
+                        title = "구간별 출현 편차",
+                        dotColor = Color(0xFF3B82F6),
+                        trailing = "전체 회차"
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            sectionCounts.forEachIndexed { index, count ->
-                                val percent = if (totalSectionNumbers > 0) count * 100 / totalSectionNumbers else 0
-                                SectionBar(
+                        Text(
+                            text = "가운데 선이 기대값이에요 (구간당 약 ${sectionExpected.roundToInt()}회, 20%)",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            sectionDeviations.forEachIndexed { index, deviation ->
+                                DeviationBar(
                                     label = sectionLabels[index],
-                                    ratio = count.toFloat() / maxSectionCount,
-                                    barColor = sectionColors[index],
-                                    countText = "${count}회 · $percent%"
+                                    deviation = deviation,
+                                    ratio = abs(deviation).toFloat() / maxAbsDeviation
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             Text(
                                 text = "번호별 상세 보기 ›",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF7C3AED),
                                 maxLines = 1,
                                 modifier = Modifier
                                     .clickable { showSectionDetailDialog = true }
-                                    .padding(horizontal = 6.dp, vertical = 8.dp)
+                                    .padding(horizontal = 4.dp, vertical = 8.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 5) 장기 미출현 번호
+                    if (longAbsent.isNotEmpty()) {
+                        TrendCard(title = "장기 미출현 번호", dotColor = Color(0xFF8B5CF6)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                longAbsent.forEach { (number, gap) ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        TrendBall(number = number, size = 28.dp, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "마지막 출현 ${lastSeen[number]}회",
+                                            fontSize = 13.sp,
+                                            color = Color(0xFF475569),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "${gap}회째",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "보너스 번호는 제외하고 센 기록이에요.",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    Text(
+                        text = "매 회차는 독립 추첨이에요. 참고용 통계예요.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
                 }
             }
         }
@@ -268,28 +355,236 @@ fun TrendScreen() {
     }
 }
 
+/** 로또 공 색 (저장 내역 화면과 같은 1-10 노랑 / 11-20 파랑 / 21-30 빨강 / 31-40 보라 / 41-45 초록). */
+private fun trendBallColor(number: Int): Color = when (number) {
+    in 1..10 -> Color(0xFFFBC02D)
+    in 11..20 -> Color(0xFF1E88E5)
+    in 21..30 -> Color(0xFFE53935)
+    in 31..40 -> Color(0xFF8E24AA)
+    else -> Color(0xFF43A047)
+}
+
+private fun signed(value: Int): String = if (value > 0) "+$value" else "$value"
+
+@Composable
+private fun TrendBall(number: Int, size: Dp = 28.dp, fontSize: androidx.compose.ui.unit.TextUnit = 13.sp) {
+    Box(
+        modifier = Modifier.size(size).background(trendBallColor(number), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "$number", fontSize = fontSize, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
 @Composable
 private fun TrendCard(
-    emoji: String,
     title: String,
-    onClick: (() -> Unit)? = null,
+    dotColor: Color,
+    trailing: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val cardModifier = if (onClick != null) {
-        Modifier.fillMaxWidth().clickable { onClick() }
-    } else {
-        Modifier.fillMaxWidth()
-    }
-    Surface(color = Color.White, shape = RoundedCornerShape(14.dp), modifier = cardModifier) {
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(emoji, fontSize = 15.sp)
+                Box(modifier = Modifier.size(8.dp).background(dotColor, CircleShape))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    modifier = Modifier.weight(1f)
+                )
+                if (trailing != null) {
+                    Text(text = trailing, fontSize = 11.sp, color = Color(0xFF94A3B8))
+                }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             content()
         }
+    }
+}
+
+/** 가장 최근 회차의 당첨번호 + 합계/홀짝/저고 요약. */
+@Composable
+private fun LatestRoundCard(draw: HistoricalDraw) {
+    val sorted = draw.numbers.sorted()
+    val sum = sorted.sum()
+    val odd = sorted.count { it % 2 != 0 }
+    val low = sorted.count { it in 1..22 }
+
+    TrendCard(
+        title = "${draw.drawNo}회 당첨번호",
+        dotColor = Color(0xFFF59E0B),
+        trailing = draw.date.replace("-", ".")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            sorted.forEach { number -> TrendBall(number = number, size = 34.dp, fontSize = 15.sp) }
+            if (draw.bonusNo in 1..45) {
+                Text("+", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                TrendBall(number = draw.bonusNo, size = 34.dp, fontSize = 15.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryChip(modifier = Modifier.weight(1f), label = "합계", value = "$sum")
+            SummaryChip(modifier = Modifier.weight(1f), label = "홀 : 짝", value = "$odd : ${6 - odd}")
+            SummaryChip(modifier = Modifier.weight(1f), label = "저 : 고", value = "$low : ${6 - low}")
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(modifier: Modifier = Modifier, label: String, value: String) {
+    Surface(color = Color(0xFFF8FAFC), shape = RoundedCornerShape(8.dp), modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, fontSize = 11.sp, color = Color(0xFF64748B))
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
+        }
+    }
+}
+
+/** 다빈도/콜드 한 줄 목록: 공 + 출현 횟수 + 번호당 평균 대비 편차. */
+@Composable
+private fun FreqColumn(
+    modifier: Modifier = Modifier,
+    title: String,
+    items: List<NumberFrequency>,
+    avg: Float,
+    devColor: Color
+) {
+    Column(modifier = modifier) {
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = devColor)
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.forEach { item ->
+                val deviation = (item.count - avg).roundToInt()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TrendBall(number = item.number, size = 28.dp, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("${item.count}회", fontSize = 13.sp, color = Color(0xFF0F172A))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(signed(deviation), fontSize = 12.sp, color = devColor)
+                }
+            }
+        }
+    }
+}
+
+/** 두 색으로 나뉜 비율 막대. 가운데(50%)에 흰 눈금을 넣어 한쪽으로 얼마나 치우쳤는지 보이게 한다. */
+@Composable
+private fun RatioBar(
+    leftLabel: String,
+    rightLabel: String,
+    percent: Int,
+    leftColor: Color,
+    rightColor: Color,
+    subLabel: String? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(leftLabel, fontSize = 13.sp, color = Color(0xFF334155))
+            Text(rightLabel, fontSize = 13.sp, color = Color(0xFF334155))
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(percent.coerceIn(0, 100).toFloat().coerceAtLeast(0.001f))
+                        .fillMaxHeight()
+                        .background(leftColor)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight((100 - percent).coerceIn(0, 100).toFloat().coerceAtLeast(0.001f))
+                        .fillMaxHeight()
+                        .background(rightColor)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(Color.White)
+            )
+        }
+        if (subLabel != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(subLabel, fontSize = 11.sp, color = Color(0xFF94A3B8))
+        }
+    }
+}
+
+/** 기대값을 가운데 선으로 두고, 많이 나온 구간은 오른쪽(파랑), 적게 나온 구간은 왼쪽(회색)으로 뻗는 막대. */
+@Composable
+private fun DeviationBar(label: String, deviation: Int, ratio: Float) {
+    val positiveColor = Color(0xFF3B82F6)
+    val negativeColor = Color(0xFF94A3B8)
+    val safeRatio = ratio.coerceIn(0f, 1f)
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, fontSize = 12.sp, color = Color(0xFF64748B), modifier = Modifier.width(44.dp))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(10.dp)
+                .background(Color(0xFFF1F5F9), RoundedCornerShape(5.dp))
+        ) {
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterEnd) {
+                if (deviation < 0 && safeRatio > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(safeRatio)
+                            .fillMaxHeight()
+                            .background(
+                                negativeColor,
+                                RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp)
+                            )
+                    )
+                }
+            }
+            Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color(0xFFCBD5E1)))
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+                if (deviation > 0 && safeRatio > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(safeRatio)
+                            .fillMaxHeight()
+                            .background(
+                                positiveColor,
+                                RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)
+                            )
+                    )
+                }
+            }
+        }
+        Text(
+            text = "${signed(deviation)}회",
+            fontSize = 12.sp,
+            fontWeight = if (deviation > 0) FontWeight.Bold else FontWeight.Normal,
+            color = if (deviation > 0) positiveColor else Color(0xFF64748B),
+            modifier = Modifier.width(52.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End
+        )
     }
 }
 
@@ -382,7 +677,7 @@ private fun SectionDetailDialog(draws: List<HistoricalDraw>, onDismiss: () -> Un
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "1,240여 회차 전체 기준, 번호 하나하나의 출현 횟수예요.",
+                    text = "${draws.size}회차 전체 기준, 번호 하나하나의 출현 횟수예요.",
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8),
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -428,75 +723,4 @@ private fun SectionDetailDialog(draws: List<HistoricalDraw>, onDismiss: () -> Un
             TextButton(onClick = onDismiss) { Text("닫기", color = Color(0xFF7C3AED)) }
         }
     )
-}
-
-@Composable
-private fun MiniBallRow(items: List<NumberFrequency>, ballColor: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items.forEach { item ->
-            Box(
-                modifier = Modifier.size(30.dp).background(ballColor, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "${item.number}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RatioBar(modifier: Modifier = Modifier, leftLabel: String, rightLabel: String, percent: Int, barColor: Color, subLabel: String? = null) {
-    Column(modifier = modifier) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(leftLabel, fontSize = 11.sp, color = Color(0xFF64748B))
-            Text(rightLabel, fontSize = 11.sp, color = Color(0xFF64748B))
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .background(Color(0xFFF1F5F9), RoundedCornerShape(3.dp))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = (percent / 100f).coerceIn(0f, 1f))
-                    .height(6.dp)
-                    .background(barColor, RoundedCornerShape(3.dp))
-            )
-        }
-        if (subLabel != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(subLabel, fontSize = 10.sp, color = Color(0xFF94A3B8))
-        }
-    }
-}
-
-@Composable
-private fun SectionBar(label: String, ratio: Float, barColor: Color, countText: String) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, fontSize = 10.sp, color = Color(0xFF94A3B8), modifier = Modifier.width(40.dp))
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(9.dp)
-                    .background(Color(0xFFF1F5F9), RoundedCornerShape(4.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction = ratio.coerceIn(0f, 1f))
-                        .height(9.dp)
-                        .background(barColor, RoundedCornerShape(4.dp))
-                )
-            }
-            Text(
-                text = countText,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = barColor,
-                modifier = Modifier.width(64.dp)
-            )
-        }
-    }
 }
