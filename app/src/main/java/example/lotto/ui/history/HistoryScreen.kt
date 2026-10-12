@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,7 @@ import com.kimro.ai.lotto.data.local.LottoEntity
 import com.kimro.ai.lotto.ui.analysis.HistoricalDraw
 import com.kimro.ai.lotto.ui.analysis.analyzeLottoSet
 import com.kimro.ai.lotto.ui.analysis.fetchHistoricalDraws
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -170,6 +172,16 @@ private fun estimateTargetRound(savedAt: String): Int {
     return (diff / weekMillis).toInt() + 2
 }
 
+/** 해당 회차의 추첨 결과가 올라올 시각(추첨일 20:45 KST)이 지났는지. */
+private fun isDrawPublished(round: Int): Boolean {
+    val kst = TimeZone.getTimeZone("Asia/Seoul")
+    val base = Calendar.getInstance(kst).apply {
+        clear(); set(2002, Calendar.DECEMBER, 7, 20, 45, 0)
+    }.timeInMillis
+    val drawMillis = base + (round - 1) * 7L * 24 * 60 * 60 * 1000
+    return System.currentTimeMillis() >= drawMillis
+}
+
 /** 저장된 조합 한 개의 당첨 확인 결과. rank 0은 낙첨, 1~5는 등수. */
 private sealed class DrawStatus {
     data class Pending(val round: Int) : DrawStatus()
@@ -226,15 +238,29 @@ fun HistoryScreen(
     // 당첨 확인용 회차 데이터는 카드마다 받지 않고, 화면에서 한 번만 불러와 모든 카드가 같이 쓴다.
     // 불러오기에 실패하면 null로 두고, 카드에는 당첨 상태를 표시하지 않는다.
     var drawsByNo by remember { mutableStateOf<Map<Int, HistoricalDraw>?>(null) }
+    val latestList by rememberUpdatedState(historyList)
     LaunchedEffect(historyList.isEmpty()) {
-        if (historyList.isNotEmpty() && drawsByNo == null) {
-            drawsByNo = try {
+        if (historyList.isEmpty()) return@LaunchedEffect
+        // 추첨 시각이 지났는데 결과가 아직 없는 회차가 있으면 30초마다 다시 조회한다(최대 30분).
+        var retries = 0
+        while (true) {
+            val loaded = try {
                 fetchHistoricalDraws().associateBy { it.drawNo.toInt() }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 null
             }
+            if (loaded != null) drawsByNo = loaded
+
+            val needRetry = loaded == null || latestList.any { e ->
+                val nums = e.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
+                val st = resolveDrawStatus(e, nums, loaded)
+                st is DrawStatus.Pending && isDrawPublished(st.round)
+            }
+            if (!needRetry || retries >= 60) break
+            retries++
+            delay(30_000)
         }
     }
 
