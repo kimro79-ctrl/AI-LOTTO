@@ -2693,18 +2693,49 @@ data class HistoricalDraw(val drawNo: Int, val numbers: List<Int>, val bonusNo: 
 // 한 번 받아온 결과를 메모리에 캐시해둔다.
 object HistoricalDrawCache {
     var draws: List<HistoricalDraw>? = null
+    var lastFetchAt: Long = 0L
+}
+
+// 추첨(토 20:45 KST) 시각이 지났다면 최소 이 회차까지는 데이터에 있어야 한다.
+private fun expectedLatestRound(): Int {
+    val kst = java.util.TimeZone.getTimeZone("Asia/Seoul")
+    val base = java.util.Calendar.getInstance(kst).apply {
+        clear(); set(2002, java.util.Calendar.DECEMBER, 7, 20, 45, 0)
+    }.timeInMillis
+    val diff = System.currentTimeMillis() - base
+    return if (diff < 0) 0 else (diff / (7L * 24 * 60 * 60 * 1000)).toInt() + 1
 }
 
 /**
  * 로또 전체 회차(1회~최신) 과거 당첨 데이터를 실시간으로 받아온다.
  * 출처: smok95/lotto (GitHub, 커뮤니티가 관리하는 공개 데이터셋). 동행복권 공식 API가 아니므로
  * 최신 회차 반영이 늦거나 일시적으로 접속이 안 될 수 있다.
+ *
+ * 캐시가 있어도 추첨 시각이 지났는데 해당 회차가 캐시에 없으면(30초 간격 제한) 다시 받아온다.
  */
 suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
-    HistoricalDrawCache.draws?.let { return it }
+    val cached = HistoricalDrawCache.draws
+    if (cached != null) {
+        val cachedMax = cached.maxOfOrNull { it.drawNo } ?: 0
+        val now = System.currentTimeMillis()
+        if (cachedMax >= expectedLatestRound() || now - HistoricalDrawCache.lastFetchAt < 30_000) {
+            return cached
+        }
+        return try {
+            downloadHistoricalDraws(bustCache = true)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            cached
+        }
+    }
+    return downloadHistoricalDraws(bustCache = true)
+}
 
+private suspend fun downloadHistoricalDraws(bustCache: Boolean): List<HistoricalDraw> {
     return withContext(Dispatchers.IO) {
-        val connection = URL("https://smok95.github.io/lotto/results/all.json").openConnection() as HttpURLConnection
+        val suffix = if (bustCache) "?t=${System.currentTimeMillis()}" else ""
+        val connection = URL("https://smok95.github.io/lotto/results/all.json$suffix").openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "GET"
             connection.connectTimeout = 10000
@@ -2725,7 +2756,10 @@ suspend fun fetchHistoricalDraws(): List<HistoricalDraw> {
         } finally {
             connection.disconnect()
         }
-    }.also { HistoricalDrawCache.draws = it }
+    }.also {
+        HistoricalDrawCache.draws = it
+        HistoricalDrawCache.lastFetchAt = System.currentTimeMillis()
+    }
 }
 
 // 번호 1개 + 전체 회차 동안 나온 횟수
