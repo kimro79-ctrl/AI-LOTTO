@@ -1,7 +1,12 @@
 // File Path: app/src/main/java/com/kimro/ai/lotto/ui/trend/TrendScreen.kt
 package com.kimro.ai.lotto.ui.trend
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,16 +14,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kimro.ai.lotto.R
 import com.kimro.ai.lotto.ui.analysis.HistoricalDraw
 import com.kimro.ai.lotto.ui.analysis.HotColdDialog
 import com.kimro.ai.lotto.ui.analysis.NumberFrequency
@@ -27,6 +38,15 @@ import com.kimro.ai.lotto.ui.analysis.fetchHistoricalDraws
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+/** 교차 홍보할 냥냥톡의 앱 ID (Play Console에 등록된 값과 같아야 함). */
+private const val NYANGTALK_PACKAGE = "com.yourpkg.cattranslator"
+
+/** Play Console 설치 출처 집계용 referrer - "ailotto"에서 온 설치로 따로 보임. */
+private const val NYANGTALK_REFERRER = "utm_source%3Dailotto"
+
+private const val TREND_PREFS = "trend_prefs"
+private const val KEY_NYANGTALK_BANNER_DISMISSED = "nyangtalk_banner_dismissed"
 
 /**
  * "최신경향" 탭.
@@ -45,6 +65,13 @@ fun TrendScreen() {
     var showSectionDetailDialog by remember { mutableStateOf(false) }
     var showOddEvenDetailDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // 냥냥톡 배너: 한 번 닫으면 다시 안 보이게 기기에 저장
+    val context = LocalContext.current
+    val trendPrefs = remember { context.getSharedPreferences(TREND_PREFS, Context.MODE_PRIVATE) }
+    var showNyangtalkBanner by remember {
+        mutableStateOf(!trendPrefs.getBoolean(KEY_NYANGTALK_BANNER_DISMISSED, false))
+    }
 
     fun load() {
         isLoading = true
@@ -171,6 +198,18 @@ fun TrendScreen() {
                     // 1) 최신 회차 요약
                     if (latest != null) {
                         LatestRoundCard(draw = latest)
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // 1-2) 냥냥톡 배너 (개발자의 다른 앱, 닫기 가능)
+                    if (showNyangtalkBanner) {
+                        NyangtalkBanner(
+                            onClick = { openNyangtalkStore(context) },
+                            onDismiss = {
+                                showNyangtalkBanner = false
+                                trendPrefs.edit().putBoolean(KEY_NYANGTALK_BANNER_DISMISSED, true).apply()
+                            }
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
                     }
 
@@ -352,6 +391,72 @@ fun TrendScreen() {
             recentDraws = allDraws!!.sortedByDescending { it.drawNo }.take(10),
             onDismiss = { showOddEvenDetailDialog = false }
         )
+    }
+}
+
+/** 냥냥톡 Play 스토어 페이지를 연다. 스토어 앱이 없으면 웹 주소로 넘어간다. */
+private fun openNyangtalkStore(context: Context) {
+    val market = Uri.parse("market://details?id=$NYANGTALK_PACKAGE&referrer=$NYANGTALK_REFERRER")
+    val web = Uri.parse("https://play.google.com/store/apps/details?id=$NYANGTALK_PACKAGE&referrer=$NYANGTALK_REFERRER")
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, market).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: ActivityNotFoundException) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, web).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e2: Exception) {
+            // 열 수 있는 앱이 아예 없으면 조용히 무시
+        }
+    }
+}
+
+/**
+ * 개발자의 다른 앱(냥냥톡) 소개 배너. 번호 생성 흐름과 떨어진 최신경향 화면에만 두고,
+ * 광고가 아니라 "개발자의 다른 앱"임을 라벨로 밝히며, 오른쪽 위 X로 닫을 수 있다.
+ * 가로가 긴 이미지라 높이를 130dp로 제한하고 가운데 기준으로 잘라 보여준다.
+ */
+@Composable
+private fun NyangtalkBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.nyangtalk_banner),
+            contentDescription = "냥냥톡 - 고양이의 마음을 번역해요",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Surface(
+            color = Color(0x99000000),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+        ) {
+            Text(
+                text = "개발자의 다른 앱",
+                fontSize = 11.sp,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .size(30.dp)
+                .background(Color(0x99000000), CircleShape)
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "닫기",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 
