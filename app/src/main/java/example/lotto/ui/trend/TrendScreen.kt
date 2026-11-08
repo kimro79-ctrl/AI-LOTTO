@@ -39,14 +39,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** 교차 홍보할 냥냥톡의 앱 ID (Play Console에 등록된 값과 같아야 함). */
-private const val NYANGTALK_PACKAGE = "com.yourpkg.cattranslator"
+/** 교차 홍보할 냥사주의 앱 ID. */
+private const val NYANGSAJU_PACKAGE = "app.nyangsaju.myosaju"
 
 /** Play Console 설치 출처 집계용 referrer - "ailotto"에서 온 설치로 따로 보임. */
-private const val NYANGTALK_REFERRER = "utm_source%3Dailotto"
+private const val NYANGSAJU_REFERRER = "utm_source%3Dailotto"
 
 private const val TREND_PREFS = "trend_prefs"
-private const val KEY_NYANGTALK_BANNER_DISMISSED = "nyangtalk_banner_dismissed"
+private const val KEY_NYANGSAJU_BANNER_DISMISSED = "nyangsaju_banner_dismissed"
 
 /**
  * "최신경향" 탭.
@@ -66,11 +66,11 @@ fun TrendScreen() {
     var showOddEvenDetailDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // 냥냥톡 배너: 한 번 닫으면 다시 안 보이게 기기에 저장
+    // 냥사주 배너: 한 번 닫으면 다시 안 보이게 기기에 저장
     val context = LocalContext.current
     val trendPrefs = remember { context.getSharedPreferences(TREND_PREFS, Context.MODE_PRIVATE) }
-    var showNyangtalkBanner by remember {
-        mutableStateOf(!trendPrefs.getBoolean(KEY_NYANGTALK_BANNER_DISMISSED, false))
+    var showNyangsajuBanner by remember {
+        mutableStateOf(!trendPrefs.getBoolean(KEY_NYANGSAJU_BANNER_DISMISSED, false))
     }
 
     fun load() {
@@ -201,13 +201,13 @@ fun TrendScreen() {
                         Spacer(modifier = Modifier.height(10.dp))
                     }
 
-                    // 1-2) 냥냥톡 배너 (개발자의 다른 앱, 닫기 가능)
-                    if (showNyangtalkBanner) {
-                        NyangtalkBanner(
-                            onClick = { openNyangtalkStore(context) },
+                    // 1-2) 냥사주 배너 (개발자의 다른 앱, 닫기 가능)
+                    if (showNyangsajuBanner) {
+                        NyangsajuBanner(
+                            onClick = { openNyangsajuStore(context) },
                             onDismiss = {
-                                showNyangtalkBanner = false
-                                trendPrefs.edit().putBoolean(KEY_NYANGTALK_BANNER_DISMISSED, true).apply()
+                                showNyangsajuBanner = false
+                                trendPrefs.edit().putBoolean(KEY_NYANGSAJU_BANNER_DISMISSED, true).apply()
                             }
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -394,10 +394,10 @@ fun TrendScreen() {
     }
 }
 
-/** 냥냥톡 Play 스토어 페이지를 연다. 스토어 앱이 없으면 웹 주소로 넘어간다. */
-private fun openNyangtalkStore(context: Context) {
-    val market = Uri.parse("market://details?id=$NYANGTALK_PACKAGE&referrer=$NYANGTALK_REFERRER")
-    val web = Uri.parse("https://play.google.com/store/apps/details?id=$NYANGTALK_PACKAGE&referrer=$NYANGTALK_REFERRER")
+/** 냥사주 Play 스토어 페이지를 연다. 스토어 앱이 없으면 웹 주소로 넘어간다. */
+private fun openNyangsajuStore(context: Context) {
+    val market = Uri.parse("market://details?id=$NYANGSAJU_PACKAGE&referrer=$NYANGSAJU_REFERRER")
+    val web = Uri.parse("https://play.google.com/store/apps/details?id=$NYANGSAJU_PACKAGE&referrer=$NYANGSAJU_REFERRER")
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, market).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: ActivityNotFoundException) {
@@ -410,12 +410,12 @@ private fun openNyangtalkStore(context: Context) {
 }
 
 /**
- * 개발자의 다른 앱(냥냥톡) 소개 배너. 번호 생성 흐름과 떨어진 최신경향 화면에만 두고,
+ * 개발자의 다른 앱(냥사주) 소개 배너. 번호 생성 흐름과 떨어진 최신경향 화면에만 두고,
  * 광고가 아니라 "개발자의 다른 앱"임을 라벨로 밝히며, 오른쪽 위 X로 닫을 수 있다.
- * 가로가 긴 이미지라 높이를 130dp로 제한하고 가운데 기준으로 잘라 보여준다.
+ * 가로가 긴 이미지라 높이를 130dp로 제한하고, 글자와 고양이 얼굴이 함께 보이도록 세로는 가운데보다 살짝 위쪽을 기준으로 잘라 보여준다.
  */
 @Composable
-private fun NyangtalkBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
+private fun NyangsajuBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -424,9 +424,10 @@ private fun NyangtalkBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
             .clickable { onClick() }
     ) {
         Image(
-            painter = painterResource(id = R.drawable.nyangtalk_banner),
-            contentDescription = "냥냥톡 - 고양이의 마음을 번역해요",
+            painter = painterResource(id = R.drawable.nyangsaju_banner),
+            contentDescription = "냥사주 - 고양이 묘선생의 사주 상담",
             contentScale = ContentScale.Crop,
+            alignment = androidx.compose.ui.BiasAlignment(0f, -0.45f),
             modifier = Modifier.fillMaxSize()
         )
         Surface(
