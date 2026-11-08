@@ -48,13 +48,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle 8.9
+      # Gradle 자체는 아래 단계에서 직접(재시도 + 여러 주소) 받는다.
+      # 예전에는 이 단계의 gradle-version: '8.9'가 services.gradle.org에서 한 번만 받다가
+      # 504(서버 일시 장애)가 나면 바로 빌드가 실패했다. 여기서는 의존성 캐시만 맡긴다.
+      - name: Setup Gradle (cache only)
         uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.9'
+
+      - name: Download Gradle 8.9 (retry + mirrors)
+        run: |
+          URLS="https://services.gradle.org/distributions/gradle-8.9-bin.zip https://downloads.gradle.org/distributions/gradle-8.9-bin.zip https://github.com/gradle/gradle-distributions/releases/download/v8.9.0/gradle-8.9-bin.zip"
+          ok=0
+          for attempt in 1 2 3 4 5 6; do
+            for url in $URLS; do
+              echo "Attempt $attempt: $url"
+              if curl -fSL --connect-timeout 20 --max-time 300 -o /tmp/gradle-8.9-bin.zip "$url" && unzip -tq /tmp/gradle-8.9-bin.zip > /dev/null; then
+                ok=1
+                break 2
+              fi
+              rm -f /tmp/gradle-8.9-bin.zip
+            done
+            echo "All sources failed, waiting 30s..."
+            sleep 30
+          done
+          if [ "$ok" != "1" ]; then
+            echo "Could not download Gradle 8.9"
+            exit 1
+          fi
+          unzip -q /tmp/gradle-8.9-bin.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
 
       - name: Generate Gradle Wrapper 8.9
         run: gradle wrapper --gradle-version 8.9 --distribution-type bin
+
+      # gradlew가 같은 Gradle을 인터넷에서 또 받지 않도록, 방금 받아 둔 파일을 쓰게 한다.
+      - name: Use downloaded Gradle (skip second download)
+        run: sed -i 's#^distributionUrl=.*#distributionUrl=file:///tmp/gradle-8.9-bin.zip#' gradle/wrapper/gradle-wrapper.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
