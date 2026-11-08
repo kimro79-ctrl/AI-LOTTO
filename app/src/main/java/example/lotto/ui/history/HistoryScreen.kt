@@ -1,6 +1,7 @@
 // File Path: app/src/main/java/com/kimro/ai/lotto/ui/history/HistoryScreen.kt
 package com.kimro.ai.lotto.ui.history
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,11 +56,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kimro.ai.lotto.R
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kimro.ai.lotto.data.local.LottoEntity
@@ -182,6 +186,15 @@ private fun isDrawPublished(round: Int): Boolean {
     return System.currentTimeMillis() >= drawMillis
 }
 
+/** 교차 홍보할 냥사주의 앱 ID. */
+private const val NYANGSAJU_PACKAGE = "app.nyangsaju.myosaju"
+
+/** Play Console 설치 출처 집계용 referrer - "ailotto"에서 온 설치로 따로 보인다. */
+private const val NYANGSAJU_REFERRER = "utm_source%3Dailotto"
+
+private const val HISTORY_PREFS = "history_prefs"
+private const val KEY_NYANGSAJU_BANNER_DISMISSED = "nyangsaju_banner_dismissed"
+
 private fun parseNumbers(entity: LottoEntity): List<Int> =
     entity.numbers.split(",").mapNotNull { it.trim().toIntOrNull() }
 
@@ -263,6 +276,12 @@ fun HistoryScreen(
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showSelectedDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    // 냥사주 배너: 한 번 닫으면 다시 안 보이게 기기에 저장
+    val historyPrefs = remember { context.getSharedPreferences(HISTORY_PREFS, android.content.Context.MODE_PRIVATE) }
+    var showNyangsajuBanner by remember {
+        mutableStateOf(!historyPrefs.getBoolean(KEY_NYANGSAJU_BANNER_DISMISSED, false))
+    }
 
     // 당첨 확인용 회차 데이터는 카드마다 받지 않고, 화면에서 한 번만 불러와 모든 카드가 같이 쓴다.
     // 불러오기에 실패하면 null로 두고, 카드에는 당첨 상태를 표시하지 않는다.
@@ -367,6 +386,18 @@ fun HistoryScreen(
                     }
                 }
             }
+        }
+
+        // 냥사주 배너 (개발자의 다른 앱) - 저장 내역 제목 바로 아래. 선택 모드에서는 숨긴다.
+        if (showNyangsajuBanner && !isSelectionMode) {
+            NyangsajuBanner(
+                onClick = { openNyangsajuStore(context) },
+                onDismiss = {
+                    showNyangsajuBanner = false
+                    historyPrefs.edit().putBoolean(KEY_NYANGSAJU_BANNER_DISMISSED, true).apply()
+                }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // 선택 모드일 때 화면 사용법을 짧게 안내한다 - "선택이 뭘 하는건지 모르겠다"는 혼란을 줄이기 위함.
@@ -645,6 +676,79 @@ fun HistoryScreen(
                 }
             }
         )
+    }
+}
+
+/** 냥사주 Play 스토어 페이지를 연다. 스토어 앱이 없으면 웹 주소로 넘어간다. */
+private fun openNyangsajuStore(context: android.content.Context) {
+    val market = android.net.Uri.parse("market://details?id=$NYANGSAJU_PACKAGE&referrer=$NYANGSAJU_REFERRER")
+    val web = android.net.Uri.parse("https://play.google.com/store/apps/details?id=$NYANGSAJU_PACKAGE&referrer=$NYANGSAJU_REFERRER")
+    try {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, market)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: android.content.ActivityNotFoundException) {
+        try {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, web)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e2: Exception) {
+            // 열 수 있는 앱이 아예 없으면 조용히 무시
+        }
+    }
+}
+
+/**
+ * 개발자의 다른 앱(냥사주) 소개 배너. 광고가 아니라 "개발자의 다른 앱"임을 라벨로 밝히고,
+ * 오른쪽 위 X로 닫을 수 있다. 가로가 긴 이미지라 높이를 130dp로 제한하고,
+ * 글자와 고양이 얼굴이 함께 보이도록 세로는 가운데보다 살짝 위쪽을 기준으로 잘라 보여준다.
+ */
+@Composable
+private fun NyangsajuBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.nyangsaju_banner),
+            contentDescription = "냥사주 - 고양이 묘선생의 사주 상담",
+            contentScale = ContentScale.Crop,
+            alignment = androidx.compose.ui.BiasAlignment(0f, -0.45f),
+            modifier = Modifier.fillMaxSize()
+        )
+        Surface(
+            color = Color(0x99000000),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+        ) {
+            Text(
+                text = "개발자의 다른 앱",
+                fontSize = 11.sp,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .size(30.dp)
+                .background(Color(0x99000000), CircleShape)
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "닫기",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 
