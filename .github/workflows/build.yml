@@ -107,8 +107,9 @@ jobs:
           
           echo "Updated Version Code to $BUILD_NUMBER and Version Name to 1.0.$BUILD_NUMBER"
 
-      - name: Build Release App Bundle (Signed)
-        run: ./gradlew bundleRelease
+      # AAB(구글 플레이용)와 APK(원스토어/갤럭시 스토어용)를 한 번에 빌드한다.
+      - name: Build Release App Bundle and APK (Signed)
+        run: ./gradlew bundleRelease assembleRelease
         env:
           KEYSTORE_FILE: app/upload-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -125,3 +126,10 @@ jobs:
         with:
           name: release-bundle
           path: app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/app-release.apk
