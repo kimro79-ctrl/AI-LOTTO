@@ -83,15 +83,15 @@ object InterstitialAdManager {
     }
 
     // ── "번호 생성" 버튼 전용 확률 + 쿨다운 로직 ─────────────────────────────
-    // 매번 1/10 확률로 뽑으면 운 나쁘면 연달아 걸릴 수 있어서, 광고가 뜬 직후로부터
+    // 매번 1/5 확률로 뽑으면 운 나쁘면 연달아 걸릴 수 있어서, 광고가 뜬 직후로부터
     // 최소 GENERATE_AD_COOLDOWN번은 무조건 광고 없이 넘어가도록 보장한다.
-    private const val GENERATE_AD_PROBABILITY = 0.10
-    private const val GENERATE_AD_COOLDOWN = 4
+    private const val GENERATE_AD_PROBABILITY = 0.20
+    private const val GENERATE_AD_COOLDOWN = 3
     private var clicksSinceLastAd = 0
 
     /**
      * "번호 생성" 버튼을 누를 때마다 호출한다. 이번 클릭에 전면 광고를 보여줘야 하면 true.
-     * 쿨다운 중이면 항상 false이고, 쿨다운이 끝난 뒤부터는 클릭마다 1/10 확률로 true가 나온다.
+     * 쿨다운 중이면 항상 false이고, 쿨다운이 끝난 뒤부터는 클릭마다 1/5 확률로 true가 나온다.
      * true를 반환하는 순간 쿨다운 카운터를 리셋한다.
      */
     fun shouldShowGenerateAd(): Boolean {
