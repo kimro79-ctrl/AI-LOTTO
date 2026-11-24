@@ -92,6 +92,10 @@ fun AnalysisScreen(
     val excludedNumbers by viewModel.excludedNumbers.collectAsState()
     val watchlistNumbers by viewModel.watchlistNumbers.collectAsState()
     val allowConsecutiveNumbers by viewModel.allowConsecutiveNumbers.collectAsState()
+    // 랜덤워크 5단계 통합분석 (스마트 패턴 분석과 독립된 카드)
+    val pipelineSets by viewModel.pipelineSets.collectAsState()
+    val pipelineSummary by viewModel.pipelineSummary.collectAsState()
+    val isPipelineGenerating by viewModel.isPipelineGenerating.collectAsState()
 
     var showConditionDialog by remember { mutableStateOf(false) }
     var showLogicInfoDialog by remember { mutableStateOf(false) }
@@ -100,6 +104,7 @@ fun AnalysisScreen(
     var showWatchlistDialog by remember { mutableStateOf(false) }
     var showBatchBacktestDialog by remember { mutableStateOf(false) }
     var selectedSetCount by remember { mutableIntStateOf(5) }
+    var pipelineSetCount by remember { mutableIntStateOf(5) }
 
     // 앱 사용법 안내 팝업 - "오늘 하루 보지 않기"를 체크하지 않으면 앱을 켤 때마다 다시 뜬다.
     var showGuideDialog by remember { mutableStateOf(false) }
@@ -184,6 +189,65 @@ fun AnalysisScreen(
                 ) {
                     CheckWinResultBanner(modifier = Modifier.weight(1f))
                     FindStoreButton(modifier = Modifier.weight(1f))
+                }
+            }
+
+            // 1-1. 랜덤워크 5단계 통합분석 (독립 카드, 스마트 패턴 분석 위)
+            item {
+                RandomWalkPipelineCard(
+                    selectedCount = pipelineSetCount,
+                    onCountSelected = { pipelineSetCount = it },
+                    onGenerateClick = {
+                        // 무료 기능이라 다른 무료 조건들과 같은 규칙으로 가끔 전면 광고가 뜬 뒤 생성이 이어진다.
+                        val activity = context as? android.app.Activity
+                        if (activity != null && com.kimro.ai.lotto.ads.InterstitialAdManager.shouldShowGenerateAd()) {
+                            com.kimro.ai.lotto.ads.InterstitialAdManager.showAd(
+                                activity = activity,
+                                onAdClosed = { viewModel.generatePipelineNumbers(pipelineSetCount) },
+                                onAdUnavailable = { viewModel.generatePipelineNumbers(pipelineSetCount) }
+                            )
+                        } else {
+                            viewModel.generatePipelineNumbers(pipelineSetCount)
+                        }
+                    },
+                    isGenerating = isPipelineGenerating,
+                    summary = pipelineSummary
+                )
+            }
+
+            if (pipelineSets.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "통합분석 결과 (${pipelineSets.size}개)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF0F172A)
+                        )
+                        Button(
+                            onClick = { viewModel.savePipelineSets() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("내역 저장", fontSize = 13.sp, color = Color.White)
+                        }
+                    }
+                }
+
+                itemsIndexed(pipelineSets) { index, set ->
+                    LottoSetCard(
+                        viewModel = viewModel,
+                        setIndex = index + 1,
+                        numbers = set,
+                        initiallyExpanded = false,
+                        onSaveClick = { viewModel.saveSinglePipelineSet(set) },
+                        conditionLabel = CONDITION_PIPELINE
+                    )
                 }
             }
 
@@ -4098,6 +4162,7 @@ private fun conditionEmoji(condition: String): String = when (condition) {
     CONDITION_COMPANION_NUMBERS -> "🤝"
     CONDITION_FREQUENCY -> "📊"
     CONDITION_RANDOM_PICK -> "🎲"
+    CONDITION_PIPELINE -> "🧩"
     else -> "✨"
 }
 
@@ -4126,6 +4191,7 @@ private fun conditionAccentColor(condition: String): Color = when (condition) {
     CONDITION_COMPANION_NUMBERS -> Color(0xFF0891B2)
     CONDITION_FREQUENCY -> Color(0xFFCA8A04)
     CONDITION_RANDOM_PICK -> Color(0xFFC2410C)
+    CONDITION_PIPELINE -> Color(0xFF0D9488)
     else -> Color(0xFF0284C7)
 }
 
@@ -4255,4 +4321,193 @@ fun ConditionSelectDialog(
         shape = RoundedCornerShape(20.dp),
         containerColor = Color.White
     )
+}
+
+/**
+ * 랜덤워크 5단계 통합분석 카드. 스마트 패턴 분석 카드와 독립적으로 동작하며 자기 조합 수·생성 버튼·결과 요약을 가진다.
+ * 5단계: ① 누적 통계 → ② 평균 대비 편차 가중 → ③ 7대 로직 패턴 필터 → ④ 후보 압축 → ⑤ 조합 생성.
+ * ⚠️ 참고용 도구이며 당첨 확률을 높이지 않는다는 안내를 카드 안에 항상 함께 보여준다.
+ */
+@Composable
+fun RandomWalkPipelineCard(
+    selectedCount: Int,
+    onCountSelected: (Int) -> Unit,
+    onGenerateClick: () -> Unit,
+    isGenerating: Boolean,
+    summary: PipelineSummary?
+) {
+    val teal = Color(0xFF0D9488)
+    val tealDark = Color(0xFF0B6B62)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 2.dp, color = teal, shape = RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "🧩", fontSize = 26.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = CONDITION_PIPELINE,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = tealDark
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(color = Color(0xFFEF4444), shape = RoundedCornerShape(6.dp)) {
+                            Text(
+                                text = "NEW",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "통계 · 편차 · 필터 · 압축을 한 번에 적용",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+
+            // ①~⑤ 흐름 한 줄
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFECFDF5))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val stepLabels = listOf("① 통계", "② 편차", "③ 필터", "④ 압축", "⑤ 생성")
+                stepLabels.forEachIndexed { i, label ->
+                    Text(text = label, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = tealDark)
+                    if (i < stepLabels.lastIndex) {
+                        Text(text = "›", fontSize = 12.sp, color = Color(0xFF7DD3C8))
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                listOf(5, 10).forEach { count ->
+                    val isSelected = selectedCount == count
+                    OutlinedButton(
+                        onClick = { onCountSelected(count) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isSelected) Color(0xFFDFF5F1) else Color.Transparent,
+                            contentColor = if (isSelected) tealDark else Color(0xFF64748B)
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = Brush.horizontalGradient(
+                                listOf(
+                                    if (isSelected) teal else Color(0xFFCBD5E1),
+                                    if (isSelected) teal else Color(0xFFCBD5E1)
+                                )
+                            )
+                        )
+                    ) {
+                        Text(
+                            text = "${count}개 조합",
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+
+            Button(
+                onClick = onGenerateClick,
+                enabled = !isGenerating,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = teal)
+            ) {
+                Text(
+                    text = if (isGenerating) "분석 중..." else "🧩 통합분석으로 번호 생성",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+
+            // 실행 결과 요약: 반영 회차 수, 후보가 줄어든 과정
+            if (summary != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF0FDFA))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "${summary.drawCount}회차 반영 (최신 ${summary.latestDrawNo}회) · 번호당 평균 ${"%.0f".format(summary.expectedAppearances)}회",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tealDark
+                    )
+                    Text(
+                        text = "후보 ${summary.afterExcludeCount}개 → ${summary.poolNumbers.size}개 압축 (색이 진한 번호가 최종 후보)",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF475569)
+                    )
+                    val poolSet = summary.poolNumbers.toSet()
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (1..45).chunked(12).forEach { rowNumbers ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                rowNumbers.forEach { n ->
+                                    val inPool = n in poolSet
+                                    Box(
+                                        modifier = Modifier
+                                            .size(19.dp)
+                                            .clip(CircleShape)
+                                            .background(if (inPool) Color(0x330D9488) else Color(0xFFECEFF4)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$n",
+                                            fontSize = 10.sp,
+                                            fontWeight = if (inPool) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (inPool) tealDark else Color(0xFFB0B8C4)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = "과거 기록을 바탕으로 번호를 고르는 참고용 도구이며, 당첨 확률을 높이지 않습니다. 모든 조합의 당첨 확률은 같습니다.",
+                fontSize = 10.5.sp,
+                color = Color(0xFF8A6D00),
+                lineHeight = 14.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFFFF8E1))
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            )
+        }
+    }
 }

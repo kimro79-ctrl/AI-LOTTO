@@ -135,6 +135,19 @@ const val CONDITION_END_DIGIT_FILTER = "끝수 및 연속 번호 조합 제한"
 const val CONDITION_COMPANION_NUMBERS = "동반수 분석 (자주 같이 나온 번호)"
 const val CONDITION_FREQUENCY = "다빈도 번호 분석 (전체 회차 기준)"
 const val CONDITION_RANDOM_PICK = "전체 분석 조건 랜덤"
+const val CONDITION_PIPELINE = "랜덤워크 5단계 통합분석"
+
+/**
+ * 랜덤워크 통합분석(5단계) 실행 결과 요약. 화면에서 "후보가 45개 → N개로 줄어든 과정"을 보여줄 때 쓴다.
+ */
+data class PipelineSummary(
+    val drawCount: Int,              // 1단계: 반영한 전체 회차 수
+    val latestDrawNo: Int,           // 1단계: 최신 회차 번호
+    val expectedAppearances: Double, // 1단계: 번호당 평균 출현 횟수(기댓값)
+    val afterExcludeCount: Int,      // 4단계: 기피 번호를 뺀 뒤 남은 후보 수
+    val poolNumbers: List<Int>,      // 4단계: 압축 후 최종 후보 번호
+    val setCount: Int                // 5단계: 생성된 조합 수
+)
 
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
@@ -168,6 +181,18 @@ class AnalysisViewModel @Inject constructor(
     // numberSets와 인덱스가 1:1로 대응한다 (0번째 조합 = randomMixLabels[0]에 쓰인 조건).
     private val _randomMixLabels = MutableStateFlow<List<String>?>(null)
     val randomMixLabels: StateFlow<List<String>?> = _randomMixLabels.asStateFlow()
+
+    // 랜덤워크 통합분석(5단계)의 단계별 결과 요약. 스마트 패턴 분석 조건 선택과는 무관하게 유지된다.
+    private val _pipelineSummary = MutableStateFlow<PipelineSummary?>(null)
+    val pipelineSummary: StateFlow<PipelineSummary?> = _pipelineSummary.asStateFlow()
+
+    // 랜덤워크 통합분석은 스마트 패턴 분석 카드와 "독립"이라, 결과 조합과 로딩 상태를 따로 가진다.
+    // (numberSets / isGenerating을 건드리지 않으므로 아래쪽 스마트 패턴 분석 결과가 지워지지 않는다.)
+    private val _pipelineSets = MutableStateFlow<List<List<Int>>>(emptyList())
+    val pipelineSets: StateFlow<List<List<Int>>> = _pipelineSets.asStateFlow()
+
+    private val _isPipelineGenerating = MutableStateFlow(false)
+    val isPipelineGenerating: StateFlow<Boolean> = _isPipelineGenerating.asStateFlow()
 
     // 즐겨찾는 번호(항상 포함) / 기피 번호(항상 제외) 설정을 앱을 껐다 켜도 유지하기 위해 SharedPreferences에 저장한다.
     private val prefs = application.getSharedPreferences("lotto_number_prefs", Context.MODE_PRIVATE)
@@ -1252,6 +1277,129 @@ class AnalysisViewModel @Inject constructor(
             } finally {
                 _isGenerating.value = false
             }
+        }
+    }
+
+    /**
+     * 랜덤워크 통합분석: 지금까지 따로 있던 분석들을 "한 번의 흐름(5단계)"으로 묶은 생성 방식이다.
+     *  1단계 누적 통계   - 전체 회차의 번호별 출현 횟수를 센다.
+     *  2단계 편차 가중   - 평균(기댓값)보다 덜 나온 번호에 조금 더 높은 가중치를 준다.
+     *  3단계 패턴 필터   - 7대 로직(홀짝·고저·연속·끝수·합계·구간·AC값)을 통과한 조합만 쓴다.
+     *  4단계 후보 압축   - 기피 번호를 빼고, 가중치가 높은 28개로 후보를 줄인다(즐겨찾기는 항상 포함).
+     *  5단계 조합 생성   - 압축된 후보에서 가중치대로 뽑아, 3단계 필터를 통과한 조합을 setCount개 만든다.
+     * ⚠️ 로또는 매 회차 독립적인 무작위 추첨이라, 덜 나온 번호가 "곧 나온다"는 근거는 없다.
+     * 이 방식은 당첨 확률을 높이지 않으며, 과거 기록을 기준으로 번호를 고르는 참고용 도구다.
+     */
+    fun generatePipelineNumbers(setCount: Int) {
+        _isPipelineGenerating.value = true
+        _pipelineSummary.value = null
+
+        val favorites = _favoriteNumbers.value
+        val excluded = _excludedNumbers.value
+        val allowConsecutive = _allowConsecutiveNumbers.value
+
+        viewModelScope.launch {
+            try {
+                val allDraws = fetchHistoricalDraws()
+                if (allDraws.isEmpty()) {
+                    _saveMessage.value = "과거 데이터를 불러오지 못해 랜덤워크 통합분석을 적용할 수 없습니다."
+                    return@launch
+                }
+
+                // 1단계: 누적 통계 - 전체 회차 기준 번호별 출현 횟수와 평균(기댓값)
+                val counts = IntArray(46)
+                allDraws.forEach { draw -> draw.numbers.forEach { if (it in 1..45) counts[it]++ } }
+                val expected = allDraws.size * 6 / 45.0
+
+                // 2단계: 평균 대비 편차 가중 - 덜 나온 번호일수록 가중치가 조금 높다 (0.3~2.0으로 제한)
+                val weights = DoubleArray(46) { 1.0 }
+                for (n in 1..45) {
+                    val deviation = (expected - counts[n]) / expected
+                    weights[n] = (1.0 + 3.0 * deviation).coerceIn(0.3, 2.0)
+                }
+
+                // 3단계: 패턴 필터 - 고도화 종합 분석(7대 로직)과 같은 기준
+                fun passesPatternFilter(sorted: List<Int>): Boolean {
+                    val oddCount = sorted.count { it % 2 != 0 }
+                    if (oddCount !in 2..4) return false
+                    if (sorted.count { it in 1..22 } !in 2..4) return false
+                    var hasConsecutive = false
+                    for (j in 0 until sorted.size - 1) {
+                        if (sorted[j + 1] - sorted[j] == 1) { hasConsecutive = true; break }
+                    }
+                    if (!allowConsecutive && hasConsecutive) return false
+                    if (sorted.map { it % 10 }.groupBy { it }.any { it.value.size >= 3 }) return false
+                    if (sorted.sum() !in 100..175) return false
+                    val sections = listOf(1..9, 10..18, 19..27, 28..36, 37..45)
+                    if (sections.count { range -> sorted.any { it in range } } < 3) return false
+                    if (computeAcValue(sorted) < 5) return false
+                    return true
+                }
+
+                // 4단계: 후보 압축 - 기피 번호를 빼고 가중치 상위 28개만 남긴다 (즐겨찾기는 항상 포함)
+                val afterExclude = (1..45).filter { it !in excluded }
+                var pool = (afterExclude.sortedByDescending { weights[it] }.take(28) + favorites)
+                    .distinct()
+                    .sorted()
+                if (pool.size < 12) pool = afterExclude // 후보가 너무 적으면 압축하지 않는다
+
+                // 5단계: 조합 생성 - 가중치 확률로 뽑되(Efraimidis-Spirakis), 3단계 필터를 통과한 조합만 채택
+                fun weightedPick(need: Int, from: List<Int>): List<Int> =
+                    from.map { it to Math.pow(Random.nextDouble(), 1.0 / weights[it]) }
+                        .sortedByDescending { it.second }
+                        .take(need)
+                        .map { it.first }
+
+                val generatedSets = mutableListOf<List<Int>>()
+                var guard = 0
+                while (generatedSets.size < setCount && guard < setCount * 3000) {
+                    guard++
+                    val chosen = favorites.toMutableSet()
+                    val need = 6 - chosen.size
+                    if (need > 0) chosen.addAll(weightedPick(need, pool.filter { it !in chosen }))
+                    if (chosen.size < 6) break
+                    val sorted = chosen.sorted()
+                    if (passesPatternFilter(sorted) && sorted !in generatedSets) generatedSets.add(sorted)
+                }
+                // 조건이 너무 빡빡해 다 못 채운 극단적인 경우(즐겨찾기·기피 과다 등)에는 필터 없이 채운다.
+                while (generatedSets.size < setCount) {
+                    generatedSets.add(generateOneWithValidator(favorites, excluded, null))
+                }
+
+                _pipelineSets.value = generatedSets
+                _pipelineSummary.value = PipelineSummary(
+                    drawCount = allDraws.size,
+                    latestDrawNo = allDraws.maxOfOrNull { it.drawNo } ?: 0,
+                    expectedAppearances = expected,
+                    afterExcludeCount = afterExclude.size,
+                    poolNumbers = pool,
+                    setCount = generatedSets.size
+                )
+            } catch (e: Exception) {
+                _saveMessage.value = "번호 생성 중 오류가 발생했어요. 다시 시도해주세요."
+            } finally {
+                _isPipelineGenerating.value = false
+            }
+        }
+    }
+
+    /** 랜덤워크 통합분석 결과 전체를 내역에 저장한다. 조건 이름은 항상 "랜덤워크 통합분석"으로 남긴다. */
+    fun savePipelineSets() {
+        val current = _pipelineSets.value
+        if (current.isEmpty()) return
+        viewModelScope.launch {
+            current.forEach { numbers ->
+                repository.insertLotto(numbers, "ANALYSIS", conditionLabel = CONDITION_PIPELINE)
+            }
+            _saveMessage.value = "성공적으로 ${current.size}개의 조합이 내역에 저장되었습니다!"
+        }
+    }
+
+    /** 랜덤워크 통합분석 결과 중 마음에 드는 조합 하나만 내역에 저장한다. */
+    fun saveSinglePipelineSet(numbers: List<Int>) {
+        viewModelScope.launch {
+            repository.insertLotto(numbers, "ANALYSIS", conditionLabel = CONDITION_PIPELINE)
+            _saveMessage.value = "이 조합이 내역에 저장되었습니다!"
         }
     }
 
