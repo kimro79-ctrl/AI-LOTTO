@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -702,15 +703,15 @@ private fun openNyangsajuStore(context: android.content.Context) {
 
 /**
  * 개발자의 다른 앱(냥사주) 소개 배너. 광고가 아니라 "개발자의 다른 앱"임을 라벨로 밝히고,
- * 오른쪽 위 X로 닫을 수 있다. 가로가 긴 이미지라 높이를 130dp로 제한하고,
- * 글자와 고양이 얼굴이 함께 보이도록 세로는 가운데보다 살짝 위쪽을 기준으로 잘라 보여준다.
+ * 오른쪽 위 X로 닫을 수 있다. 이미지 비율(1280:605)에 맞춰 높이를 정해
+ * 글자가 잘리지 않게 하고, 라벨은 글자가 없는 오른쪽 위(닫기 버튼 왼쪽)에 둔다.
  */
 @Composable
 private fun NyangsajuBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
+            .aspectRatio(1280f / 605f)
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() }
     ) {
@@ -718,13 +719,12 @@ private fun NyangsajuBanner(onClick: () -> Unit, onDismiss: () -> Unit) {
             painter = painterResource(id = R.drawable.nyangsaju_banner),
             contentDescription = "냥사주 - 고양이 묘선생의 사주 상담",
             contentScale = ContentScale.Crop,
-            alignment = androidx.compose.ui.BiasAlignment(0f, -0.45f),
             modifier = Modifier.fillMaxSize()
         )
         Surface(
             color = Color(0x99000000),
             shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 9.dp, end = 44.dp)
         ) {
             Text(
                 text = "개발자의 다른 앱",
